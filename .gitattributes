@@ -1,0 +1,6 @@
+# Ensure all files are checked into the repo with LF line endings and checked out with LFs.
+* text=auto eol=lf
+
+# Exceptions
+*.bat text eol=crlf
+*.sln text eol=crlf
