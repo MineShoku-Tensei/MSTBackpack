@@ -1,4 +1,4 @@
-package me.DMan16;
+package me.MineShoku.Backpack;
 
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
