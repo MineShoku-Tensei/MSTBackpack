@@ -1,4 +1,4 @@
-package me.DMan16;
+package me.MineShoku.Backpack;
 
 import org.bukkit.plugin.java.JavaPlugin;
 import org.checkerframework.checker.index.qual.NonNegative;

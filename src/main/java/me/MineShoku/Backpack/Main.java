@@ -1,4 +1,4 @@
-package me.DMan16;
+package me.MineShoku.Backpack;
 
 import com.zaxxer.hikari.pool.HikariPool;
 import org.bukkit.Bukkit;

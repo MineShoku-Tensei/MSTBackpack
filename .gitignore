@@ -4,5 +4,6 @@
 *.prefs
 *.iml
 *.class
+*.jar
 target/
 bin/

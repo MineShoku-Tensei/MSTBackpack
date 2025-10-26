@@ -1,0 +1,34 @@
+name: Check release version
+
+on:
+    pull_request:
+        branches:
+            - master
+
+permissions:
+    contents: read
+
+jobs:
+    check-version-not-released:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Extract project version from POM
+              id: get_version
+              uses: dostonhamrakulov/maven-artifact-version-extractor@v1.0
+              with:
+                  file_path: ${{ github.workspace }}/pom.xml
+
+            - name: Check if release already exists
+              id: check_release
+              uses: action-pack/tag-exists@v1
+              with:
+                  tag: "v${{ steps.get_version.outputs.version }}"
+
+            - name: Fail if version already released
+              if: steps.check_release.outputs.exists == 'true'
+              run: |
+                  echo "Release tag v${{ steps.get_version.outputs.version }} already exists"
+                  exit 1
