@@ -194,11 +194,6 @@ public final class Config {
 	}
 
 	@NonNegative
-	private int amountExtrasMax() {
-		return calculateExtras(amountExtraPlayerMax(), amountExtraProfileMax());
-	}
-
-	@NonNegative
 	public int amountTotalMax() {
 		return calculateAmount(amountExtraPlayerMax(), amountExtraProfileMax());
 	}
@@ -303,8 +298,8 @@ public final class Config {
 		String msg = placeholdersPlayerProfile(this.messageExtrasSetProfile, offlinePlayer, profileID);
 		msg = Utils.replacePlaceholders(msg, PLACEHOLDER_EXTRAS, extrasProfile);
 		msg = Utils.replacePlaceholders(msg, PLACEHOLDER_EXTRAS_MAX, amountExtraProfileMax());
-		msg = Utils.replacePlaceholders(msg, PLACEHOLDER_TOTAL, calculateExtras(extrasPlayer, extrasProfile));
-		msg = Utils.replacePlaceholders(msg, PLACEHOLDER_TOTAL_MAX, amountExtrasMax());
+		msg = Utils.replacePlaceholders(msg, PLACEHOLDER_TOTAL, extrasPlayer + extrasProfile);
+		msg = Utils.replacePlaceholders(msg, PLACEHOLDER_TOTAL_MAX, amountExtraPlayerMax() + amountExtraProfileMax());
 		return Utils.toComponentMiniMessage(msg);
 	}
 
