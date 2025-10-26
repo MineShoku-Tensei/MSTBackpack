@@ -1,6 +1,7 @@
 package me.DMan16;
 
 import org.bukkit.plugin.java.JavaPlugin;
+import org.checkerframework.checker.index.qual.NonNegative;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
@@ -10,7 +11,7 @@ import java.sql.SQLException;
 public final class LocalDatabase extends Database {
 	private final @NotNull File file;
 
-	public LocalDatabase(@NotNull JavaPlugin plugin) throws ClassNotFoundException, IOException, SQLException {
+	public LocalDatabase(@NotNull Main plugin) throws ClassNotFoundException, IOException, SQLException {
 		super(createURL(createFile(plugin)), null, null);
 		this.file = createFile(plugin);
 		initiateDatabase();
@@ -33,16 +34,24 @@ public final class LocalDatabase extends Database {
 	}
 
 	private void initiateDatabase() throws IOException {
-		if (!this.file.exists()) {
-			if (!this.file.createNewFile()) {
-				throw new IOException("Couldn't create local DB file \"" + file + "\"");
-			}
+		if (!this.file.exists() && !this.file.createNewFile()) {
+			throw new IOException("Couldn't create local DB file \"" + file + "\"");
 		}
 	}
 
-	@Override
+	@NotNull
+	protected String onConflictPrefix(@NotNull String @NotNull ... keys) {
+		return "ON CONFLICT(" + String.join(", ", keys) + ") DO UPDATE SET";
+	}
+
 	@NotNull
 	protected String onConflictUpdateItems() {
-		return "ON CONFLICT(PlayerUUID, ProfileUUID) DO UPDATE SET Items=excluded.Items";
+		return onConflictUpdate(COLUMN_ITEMS + "=excluded." + COLUMN_ITEMS, COLUMN_PLAYER_ID, COLUMN_PROFILE_ID);
+	}
+
+	@NotNull
+	protected String onConflictUpdateExtras(@NonNegative int max, boolean includeProfileID) {
+		String[] keys = includeProfileID ? new String[]{COLUMN_PLAYER_ID, COLUMN_PROFILE_ID} : new String[]{COLUMN_PLAYER_ID};
+		return onConflictUpdate(COLUMN_EXTRAS + "=MIN(MAX(" + TABLE_PLAYERS + "." + COLUMN_EXTRAS + " + excluded." + COLUMN_EXTRAS + "), 0), " + max + ")", keys);
 	}
 }

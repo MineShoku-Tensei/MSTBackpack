@@ -1,7 +1,7 @@
 name: MineShokuTenseiBackpack
-version: 1.0
+version: 2.0
 description: MineShoku Tensei backpack plugin by DMan16
-main: me.DMan16.BackpackMain
+main: me.DMan16.Main
 author: DMan16
 api-version: 1.21
 depend: [MMOProfiles]
@@ -10,19 +10,15 @@ commands:
   backpack:
     permission: mst.backpack.use
 permissions:
-  mst.backpack.extra.*:
-    default: false
-  mst.backpack.extra:
-    default: false
-    children:
-      mst.backpack.extra.*: true
   mst.backpack.use:
+    default: false
+  mst.backpack.advanced:
     default: false
   mst.backpack.*:
     default: false
     children:
       mst.backpack.use: true
-      mst.backpack.extra: true
+      mst.backpack.advanced: true
   mst.backpack:
     default: op
     children:
