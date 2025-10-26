@@ -1,17 +1,15 @@
 package me.DMan16;
 
-import org.bukkit.plugin.java.JavaPlugin;
+import org.checkerframework.checker.index.qual.NonNegative;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.net.ConnectException;
 import java.sql.SQLException;
 import java.util.Objects;
 
 public final class MySQLDatabase extends Database {
-	public MySQLDatabase(@NotNull JavaPlugin plugin, @NotNull String host) throws SQLException, ClassNotFoundException, ConnectException {
-		super(createURL(host, plugin.getConfig().getInt("port",0 ), Objects.requireNonNull(plugin.getConfig().getString("database", null))),
-				plugin.getConfig().getString("username", null), plugin.getConfig().getString("password", null));
+	public MySQLDatabase(@NotNull Main plugin, @NotNull String host) throws SQLException, ClassNotFoundException {
+		super(createURL(host, plugin.config().port(), Objects.requireNonNull(plugin.config().database())), plugin.config().username(), plugin.config().password());
 		prepareDatabase();
 	}
 
@@ -25,9 +23,19 @@ public final class MySQLDatabase extends Database {
 		return null;
 	}
 
-	@Override
+	@NotNull
+	protected String onConflictPrefix(@NotNull String @NotNull ... keys) {
+		return "ON DUPLICATE KEY UPDATE";
+	}
+
 	@NotNull
 	protected String onConflictUpdateItems() {
-		return "ON DUPLICATE KEY UPDATE Items=VALUES(Items)";
+		return onConflictUpdate(COLUMN_ITEMS + "=VALUES(" + COLUMN_ITEMS + ")", COLUMN_PLAYER_ID, COLUMN_PROFILE_ID);
+	}
+
+	@NotNull
+	protected String onConflictUpdateExtras(@NonNegative int max, boolean includeProfileID) {
+		String[] keys = includeProfileID ? new String[]{COLUMN_PLAYER_ID, COLUMN_PROFILE_ID} : new String[]{COLUMN_PLAYER_ID};
+		return onConflictUpdate(COLUMN_EXTRAS + "=LEAST(GREATEST(" + TABLE_PLAYERS + "." + COLUMN_EXTRAS + " + VALUES(" + COLUMN_EXTRAS + "), 0), " + max + ")", keys);
 	}
 }
