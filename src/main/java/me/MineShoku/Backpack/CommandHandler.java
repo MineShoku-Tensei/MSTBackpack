@@ -20,6 +20,7 @@ import java.util.stream.Stream;
 public final class CommandHandler implements CommandExecutor, TabCompleter {
 	private static final @NotNull String PERMISSION_ADVANCED = "mst.backpack.advanced";
 	private static final @NotNull String EXTRAS_SET_PLAYER = "-";
+	private static final @NotNull String EXTRAS_CURRENT = ".";
 	private static final @NotNull List<@NotNull String> BASE = List.of("help", "reload", "open", "clear", "upgrade", "downgrade");
 	private static final @Positive int INDEX_OPEN = BASE.indexOf("open");
 	private static final @Positive int INDEX_CLEAR = BASE.indexOf("clear");
@@ -27,9 +28,9 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 	private static final @Positive int INDEX_DOWNGRADE = BASE.indexOf("downgrade");
 	private static final @NotNull Component HELP = MiniMessage.miniMessage().deserialize("""
 			<gold>reload - reload config file
-			open <player> <profile> - open player's inventory
-			upgrade <player> <profile> <n> - +n extras
-			downgrade <player> <profile> <n> - -n extras
+			open <player> <profile> - open player's inventory (use '.' for current player/profile)
+			upgrade <player> <profile> <n> - +n extras (use '.' for current player/profile; use '-' for profile to use on player)
+			downgrade <player> <profile> <n> - -n extras (use '.' for current player/profile; use '-' for profile to use on player)
 			""");
 
 	private final @NotNull PluginCommand command;
@@ -62,12 +63,13 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 				}
 				return true;
 			}
-			if (idx <= 0 || args.length < 2) {
+			if (idx <= 0 || args.length < 3) {
 				Utils.sendMessage(sender, HELP);
 				return true;
 			}
-			if (idx == INDEX_OPEN && !(sender instanceof Player)) return true;
-			OfflinePlayer offlinePlayer = Utils.offlinePlayerCached(args[1]);
+			boolean useCurrentPlayer = args[1].equals(EXTRAS_CURRENT);
+			if ((idx == INDEX_OPEN || useCurrentPlayer) && !(sender instanceof Player)) return true;
+			OfflinePlayer offlinePlayer = useCurrentPlayer ? (Player) sender : Utils.offlinePlayerCached(args[1]);
 			if (offlinePlayer == null) {
 				Utils.sendMessage(sender, this.plugin.config().messageNotFoundPlayer());
 				return true;
@@ -76,12 +78,21 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 			if ((idx == INDEX_UPGRADE || idx == INDEX_DOWNGRADE) && args[2].equals(EXTRAS_SET_PLAYER)) {
 				profileID = null;
 			} else {
-				profileID = Utils.getUUID(args[2]);
-				ProfileList<?> playerData;
-				if (profileID == null || (playerData = playerData(playerID)) == null || playerData.getProfile(profileID) == null) {
+				ProfileList<?> playerData = playerData(playerID);
+				PlayerProfile<?> profile = null;
+				if (playerData != null) {
+					if (!args[2].equals(EXTRAS_CURRENT)) {
+						UUID id = Utils.getUUID(args[2]);
+						profile = id == null ? null : playerData.getProfile(id);
+					} else if (offlinePlayer.isOnline()) {
+						profile = playerData.getCurrent();
+					}
+				}
+				if (profile == null) {
 					Utils.sendMessage(sender, this.plugin.config().messageNotFoundProfile());
 					return true;
 				}
+				profileID = profile.getUniqueId();
 			}
 			if (idx != INDEX_OPEN) {
 				if (idx == INDEX_CLEAR) {
@@ -205,16 +216,24 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 		int idx = BASE.indexOf(Utils.toLowerCase(args[0]));
 		if (idx < 2) return new ArrayList<>();
 		if (args.length == 2) {
-			return Bukkit.getOnlinePlayers().stream().map(Player::getName).filter(cmd -> Utils.containsTabComplete(args[1], cmd)).toList();
+			Stream<String> stream = Bukkit.getOnlinePlayers().stream().map(Player::getName);
+			if (sender instanceof Player) {
+				stream = Stream.concat(Stream.of(EXTRAS_CURRENT), stream);
+			}
+			return stream.filter(cmd -> Utils.containsTabComplete(args[1], cmd)).toList();
 		}
 		if (args.length == 3) {
-			OfflinePlayer offlinePlayer = Utils.offlinePlayerCached(args[1]);
+			OfflinePlayer offlinePlayer = args[1].equals(EXTRAS_CURRENT) ? ((sender instanceof Player player) ? player : null) : Utils.offlinePlayerCached(args[1]);
 			if (offlinePlayer == null) return new ArrayList<>();
 			UUID playerID = offlinePlayer.getUniqueId();
 			ProfileList<?> playerData = playerData(playerID);
-			Stream<String> dash = idx == INDEX_UPGRADE || idx == INDEX_DOWNGRADE ? Stream.of(EXTRAS_SET_PLAYER) : Stream.empty(),
-					players = playerData == null ? Stream.empty() : playerData.getProfiles().stream().map(PlayerProfile::getUniqueId).map(UUID::toString);
-			return Stream.concat(players, dash).filter(cmd -> Utils.containsTabComplete(args[2], cmd)).toList();
+			Stream<String> special = Stream.empty(), players = playerData == null ? Stream.empty() : playerData.getProfiles().stream().map(PlayerProfile::getUniqueId).map(UUID::toString);
+			if (idx == INDEX_UPGRADE || idx == INDEX_DOWNGRADE) {
+				special = offlinePlayer.isOnline() ? Stream.of(EXTRAS_CURRENT, EXTRAS_SET_PLAYER) : Stream.of(EXTRAS_SET_PLAYER);
+			} else if ((idx == INDEX_OPEN || idx == INDEX_CLEAR) && offlinePlayer.isOnline()) {
+				special = Stream.of(EXTRAS_CURRENT);
+			}
+			return Stream.concat(special, players).filter(cmd -> Utils.containsTabComplete(args[2], cmd)).toList();
 		}
 		return new ArrayList<>();
 	}
