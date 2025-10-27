@@ -1,6 +1,5 @@
 package me.MineShoku.Backpack;
 
-import org.checkerframework.checker.index.qual.NonNegative;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -29,13 +28,17 @@ public final class MySQLDatabase extends Database {
 	}
 
 	@NotNull
-	protected String onConflictUpdateItems() {
-		return onConflictUpdate(COLUMN_ITEMS + "=VALUES(" + COLUMN_ITEMS + ")", COLUMN_PLAYER_ID, COLUMN_PROFILE_ID);
+	protected String fromConflict(@NotNull String column) {
+		return "VALUES(" + column + ")";
 	}
 
 	@NotNull
-	protected String onConflictUpdateExtras(@NonNegative int max, boolean includeProfileID) {
-		String[] keys = includeProfileID ? new String[]{COLUMN_PLAYER_ID, COLUMN_PROFILE_ID} : new String[]{COLUMN_PLAYER_ID};
-		return onConflictUpdate(COLUMN_EXTRAS + "=LEAST(GREATEST(" + TABLE_PLAYERS + "." + COLUMN_EXTRAS + " + VALUES(" + COLUMN_EXTRAS + "), 0), " + max + ")", keys);
+	protected String functionMin() {
+		return "LEAST";
+	}
+
+	@NotNull
+	protected String functionMax() {
+		return "GREATEST";
 	}
 }

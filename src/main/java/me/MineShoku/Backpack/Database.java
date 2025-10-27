@@ -8,10 +8,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.sql.*;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 public abstract class Database {
 	private static final @NotNull String POOL_NAME = "MSTBackpack";
@@ -21,8 +18,15 @@ public abstract class Database {
 	protected static final @NotNull String COLUMN_PROFILE_ID = "ProfileUUID";
 	protected static final @NotNull String COLUMN_ITEMS = "Items";
 	protected static final @NotNull String COLUMN_EXTRAS = "Extras";
+	private static final byte @NotNull [] NULL_ITEMS_BYTES = ItemStack.serializeItemsAsBytes(Collections.emptyList());
+	private static final @NotNull String STATEMENT_GET_EXTRAS_PLAYER = "SELECT " + COLUMN_EXTRAS + " FROM " + TABLE_PLAYERS + " WHERE " + COLUMN_PLAYER_ID + "=?;";
+	private static final @NotNull String STATEMENT_GET_EXTRAS_PROFILE = "SELECT " + COLUMN_EXTRAS + " FROM " + TABLE_PROFILES + " WHERE " + COLUMN_PLAYER_ID + "=? AND " + COLUMN_PROFILE_ID + "=?;";
+	private static final @NotNull String STATEMENT_GET_INFO = "SELECT " + COLUMN_ITEMS + ", " + COLUMN_EXTRAS + " FROM " + TABLE_PROFILES + " WHERE " + COLUMN_PLAYER_ID + "=? AND " + COLUMN_PROFILE_ID + "=?;";
 
 	private final @NotNull HikariConfig hikariConfig;
+	private final @NotNull String statementSaveItems;
+	private final @NotNull String statementSaveExtrasPlayer;
+	private final @NotNull String statementSaveExtrasProfile;
 	private @Nullable HikariDataSource hikari;
 
 	protected Database(@NotNull String url, @Nullable String username, @Nullable String password) throws ClassNotFoundException {
@@ -31,6 +35,15 @@ public abstract class Database {
 			Class.forName(jdbc);
 		}
 		this.hikariConfig = createHikariConfig(url, username, password);
+		this.statementSaveItems = "INSERT INTO " + TABLE_PROFILES +
+				" (" + COLUMN_PLAYER_ID + ", " + COLUMN_PROFILE_ID + ", " + COLUMN_ITEMS + ") VALUES (?, ?, ?) " +
+				onConflictUpdate(COLUMN_ITEMS + "=" + fromConflict(COLUMN_ITEMS), COLUMN_PLAYER_ID, COLUMN_PROFILE_ID) + ";";
+		this.statementSaveExtrasPlayer = "INSERT INTO " + TABLE_PLAYERS +
+				" (" + COLUMN_PLAYER_ID + ", " + COLUMN_EXTRAS + ") VALUES (?, ?) " +
+				onConflictUpdate(COLUMN_EXTRAS + "=" + functionMin() + "(" + functionMax() + "(" + TABLE_PLAYERS + "." + COLUMN_EXTRAS + " + " + fromConflict(COLUMN_EXTRAS) + ", ?), ?)", COLUMN_PLAYER_ID) + ";";
+		this.statementSaveExtrasProfile = "INSERT INTO " + TABLE_PROFILES +
+				" (" + COLUMN_PLAYER_ID + ", " + COLUMN_PROFILE_ID + ", " + COLUMN_ITEMS + ", " + COLUMN_EXTRAS + ") VALUES (?, ?, ?, ?) " +
+				onConflictUpdate(COLUMN_EXTRAS + "=" + functionMin() + "(" + functionMax() + "(" + TABLE_PROFILES + "." + COLUMN_EXTRAS + " + " + fromConflict(COLUMN_EXTRAS) + ", ?), ?)", COLUMN_PLAYER_ID, COLUMN_PROFILE_ID) + ";";
 	}
 
 	@Nullable protected abstract String jdbc();
@@ -63,15 +76,15 @@ public abstract class Database {
 	protected final void prepareDatabase() throws SQLException {
 		try (Connection connection = getConnection(); Statement statement = connection.createStatement()) {
 			statement.execute("CREATE TABLE IF NOT EXISTS " + TABLE_PLAYERS + " (" +
-					"PlayerUUID VARCHAR(36) NOT NULL PRIMARY KEY, " +
-					"Extras INT UNSIGNED NOT NULL DEFAULT 0" +
+					COLUMN_PLAYER_ID + " VARCHAR(36) NOT NULL PRIMARY KEY, " +
+					COLUMN_EXTRAS + " INT UNSIGNED NOT NULL DEFAULT 0" +
 					");");
 			statement.execute("CREATE TABLE IF NOT EXISTS " + TABLE_PROFILES + " (" +
-					"PlayerUUID VARCHAR(36) NOT NULL, " +
-					"ProfileUUID VARCHAR(36) NOT NULL, " +
-					"Items LONGBLOB NOT NULL, " +
-					"Extras INT UNSIGNED NOT NULL DEFAULT 0, " +
-					"PRIMARY KEY (PlayerUUID, ProfileUUID)" +
+					COLUMN_PLAYER_ID + " VARCHAR(36) NOT NULL, " +
+					COLUMN_PROFILE_ID + " VARCHAR(36) NOT NULL, " +
+					COLUMN_ITEMS + " LONGBLOB NOT NULL, " +
+					COLUMN_EXTRAS + " INT UNSIGNED NOT NULL DEFAULT 0, " +
+					"PRIMARY KEY (" + COLUMN_PLAYER_ID + ", " + COLUMN_PROFILE_ID + ")" +
 					");");
 		}
 	}
@@ -97,7 +110,7 @@ public abstract class Database {
 
 	@NonNegative
 	private int getExtrasPlayer(@NotNull Connection connection, @NotNull UUID playerID) throws SQLException {
-		try (PreparedStatement statement = connection.prepareStatement("SELECT Extras FROM " + TABLE_PLAYERS + " WHERE PlayerUUID=?;")) {
+		try (PreparedStatement statement = connection.prepareStatement(STATEMENT_GET_EXTRAS_PLAYER)) {
 			statement.setString(1, playerID.toString());
 			try (ResultSet result = statement.executeQuery()) {
 				return result.next() ? result.getInt(1) : 0;
@@ -107,7 +120,7 @@ public abstract class Database {
 
 	@NonNegative
 	private int getExtrasProfile(@NotNull Connection connection, @NotNull UUID playerID, @NotNull UUID profileID) throws SQLException {
-		try (PreparedStatement statement = connection.prepareStatement("SELECT Extras FROM " + TABLE_PROFILES + " WHERE PlayerUUID=? AND ProfileUUID=?;")) {
+		try (PreparedStatement statement = connection.prepareStatement(STATEMENT_GET_EXTRAS_PROFILE)) {
 			statement.setString(1, playerID.toString());
 			statement.setString(2, profileID.toString());
 			try (ResultSet result = statement.executeQuery()) {
@@ -121,13 +134,19 @@ public abstract class Database {
 		try (Connection connection = getConnection()) {
 			List<ItemStack> items = null;
 			int extrasProfile = 0;
-			try (PreparedStatement statement = connection.prepareStatement("SELECT Items, Extras FROM " + TABLE_PROFILES + " WHERE PlayerUUID=? AND ProfileUUID=?;")) {
+			try (PreparedStatement statement = connection.prepareStatement(STATEMENT_GET_INFO)) {
 				statement.setString(1, playerID.toString());
 				statement.setString(2, profileID.toString());
 				try (ResultSet result = statement.executeQuery()) {
 					if (result.next()) {
-						items = Arrays.stream(ItemStack.deserializeItemsFromBytes(result.getBytes(1))).
-								map(item -> item.isEmpty() ? null : item).toList();
+						Object bytes = result.getObject(1);
+						if (bytes != null) {
+							items = Arrays.stream(ItemStack.deserializeItemsFromBytes(result.getBytes(1))).
+									map(item -> item.isEmpty() ? null : item).toList();
+							if (items.stream().noneMatch(Objects::nonNull)) {
+								items = null;
+							}
+						}
 						extrasProfile = result.getInt(2);
 					}
 				}
@@ -144,27 +163,31 @@ public abstract class Database {
 		return onConflictPrefix(keys) + " " + updateLogic;
 	}
 
-	@NotNull protected abstract String onConflictUpdateItems();
+	@NotNull protected abstract String fromConflict(@NotNull String column);
+
+	@NotNull protected abstract String functionMin();
+
+	@NotNull protected abstract String functionMax();
 
 	public final void saveItems(@NotNull Info info) throws SQLException {
 		try (Connection connection = getConnection()) {
-			try (PreparedStatement statement = connection.prepareStatement("INSERT INTO " + TABLE_PROFILES + " (PlayerUUID, ProfileUUID, Items) VALUES (?, ?, ?) " + onConflictUpdateItems() + ";")) {
+			try (PreparedStatement statement = connection.prepareStatement(this.statementSaveItems)) {
 				statement.setString(1, info.playerID().toString());
 				statement.setString(2, info.profileID().toString());
-				statement.setBytes(3, ItemStack.serializeItemsAsBytes(info.items() == null ? Collections.emptyList() : info.items()));
+				statement.setBytes(3, info.items() == null ? NULL_ITEMS_BYTES : ItemStack.serializeItemsAsBytes(info.items()));
 				statement.executeUpdate();
 			}
 		}
 	}
 
-	@NotNull protected abstract String onConflictUpdateExtras(@NonNegative int max, boolean includeProfileID);
-
 	public final void updateExtrasPlayer(@NotNull UUID playerID, int delta, @NonNegative int max) throws SQLException {
 		if (delta == 0) return;
 		try (Connection connection = getConnection()) {
-			try (PreparedStatement statement = connection.prepareStatement("INSERT INTO " + TABLE_PLAYERS + " (PlayerUUID, Extras) VALUES (?, ?) " + onConflictUpdateExtras(max, false) + ";")) {
+			try (PreparedStatement statement = connection.prepareStatement(this.statementSaveExtrasPlayer)) {
 				statement.setString(1, playerID.toString());
 				statement.setInt(2, delta);
+				statement.setInt(3, 0);
+				statement.setInt(4, max);
 				statement.executeUpdate();
 			}
 		}
@@ -173,10 +196,13 @@ public abstract class Database {
 	public final void updateExtrasProfile(@NotNull UUID playerID, @NotNull UUID profileID, int delta, @NonNegative int max) throws SQLException {
 		if (delta == 0) return;
 		try (Connection connection = getConnection()) {
-			try (PreparedStatement statement = connection.prepareStatement("INSERT INTO " + TABLE_PROFILES + " (PlayerUUID, ProfileUUID, Extras) VALUES (?, ?, ?) " + onConflictUpdateExtras(max, true) + ";")) {
+			try (PreparedStatement statement = connection.prepareStatement(this.statementSaveExtrasProfile)) {
 				statement.setString(1, playerID.toString());
 				statement.setString(2, profileID.toString());
-				statement.setInt(3, delta);
+				statement.setBytes(3, NULL_ITEMS_BYTES);
+				statement.setInt(4, delta);
+				statement.setInt(5, 0);
+				statement.setInt(6, max);
 				statement.executeUpdate();
 			}
 		}
