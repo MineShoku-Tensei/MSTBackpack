@@ -89,8 +89,8 @@ public final class Utils {
 		}
 	}
 
-	public static boolean containsTabComplete(@NotNull String arg1, @NotNull String arg2) {
-		return arg1.isEmpty() || toUpperCase(arg2).contains(toUpperCase(arg1));
+	public static boolean checkTabComplete(@NotNull String arg, @NotNull String test) {
+		return arg.isEmpty() || toLowerCase(test).startsWith(toLowerCase(arg));
 	}
 
 	@NotNull

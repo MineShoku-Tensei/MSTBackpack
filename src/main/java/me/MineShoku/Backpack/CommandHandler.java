@@ -12,16 +12,17 @@ import org.bukkit.entity.Player;
 import org.checkerframework.checker.index.qual.Positive;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
 public final class CommandHandler implements CommandExecutor, TabCompleter {
-	private static final @NotNull String PERMISSION_ADVANCED = "mst.backpack.advanced";
+	public static final @NotNull @Unmodifiable List<@NotNull String> BASE = List.of("help", "reload", "open", "clear", "upgrade", "downgrade");
+	public static final @NotNull String PERMISSION_ADVANCED = "mst.backpack.advanced";
 	private static final @NotNull String EXTRAS_SET_PLAYER = "-";
 	private static final @NotNull String EXTRAS_CURRENT = ".";
-	private static final @NotNull List<@NotNull String> BASE = List.of("help", "reload", "open", "clear", "upgrade", "downgrade");
 	private static final @Positive int INDEX_OPEN = BASE.indexOf("open");
 	private static final @Positive int INDEX_CLEAR = BASE.indexOf("clear");
 	private static final @Positive int INDEX_UPGRADE = BASE.indexOf("upgrade");
@@ -48,7 +49,7 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 	}
 
 	public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String @NotNull [] args) {
-		boolean advanced = hasAdvancedPermission(sender);
+		boolean advanced = sender.hasPermission(PERMISSION_ADVANCED);
 		UUID playerID, profileID;
 		Player player;
 		if (args.length > 0 && advanced) {
@@ -89,14 +90,17 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 					}
 				}
 				if (profile == null) {
-					Utils.sendMessage(sender, this.plugin.config().messageNotFoundProfile());
+					noProfile(sender);
 					return true;
 				}
 				profileID = profile.getUniqueId();
 			}
 			if (idx != INDEX_OPEN) {
 				if (idx == INDEX_CLEAR) {
-					assert profileID != null;
+					if (profileID == null) {
+						noProfile(sender);
+						return true;
+					}
 					long now = System.currentTimeMillis();
 					long clearTimeout = this.plugin.config().clearTimeout();
 					if (clearTimeout != 0) {
@@ -182,7 +186,10 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 			}
 			profileID = currentProfile.getUniqueId();
 		}
-		assert profileID != null;
+		if (profileID == null) {
+			noProfile(sender);
+			return true;
+		}
 		Utils.sendToSync(CompletableFuture.supplyAsync(() -> {
 			try {
 				return this.plugin.database().getInfo(playerID, profileID);
@@ -208,10 +215,10 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 
 	@NotNull
 	public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, String @NotNull [] args) {
-		if (!hasAdvancedPermission(sender)) return new ArrayList<>();
+		if (!sender.hasPermission(PERMISSION_ADVANCED)) return new ArrayList<>();
 		if (args.length == 0) return BASE;
 		if (args.length == 1) {
-			return BASE.stream().filter(cmd -> Utils.containsTabComplete(args[0], cmd)).toList();
+			return BASE.stream().filter(cmd -> Utils.checkTabComplete(args[0], cmd)).toList();
 		}
 		int idx = BASE.indexOf(Utils.toLowerCase(args[0]));
 		if (idx < 2) return new ArrayList<>();
@@ -220,7 +227,7 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 			if (sender instanceof Player) {
 				stream = Stream.concat(Stream.of(EXTRAS_CURRENT), stream);
 			}
-			return stream.filter(cmd -> Utils.containsTabComplete(args[1], cmd)).toList();
+			return stream.filter(cmd -> Utils.checkTabComplete(args[1], cmd)).toList();
 		}
 		if (args.length == 3) {
 			OfflinePlayer offlinePlayer = args[1].equals(EXTRAS_CURRENT) ? ((sender instanceof Player player) ? player : null) : Utils.offlinePlayerCached(args[1]);
@@ -233,9 +240,13 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 			} else if ((idx == INDEX_OPEN || idx == INDEX_CLEAR) && offlinePlayer.isOnline()) {
 				special = Stream.of(EXTRAS_CURRENT);
 			}
-			return Stream.concat(special, players).filter(cmd -> Utils.containsTabComplete(args[2], cmd)).toList();
+			return Stream.concat(special, players).filter(cmd -> Utils.checkTabComplete(args[2], cmd)).toList();
 		}
 		return new ArrayList<>();
+	}
+
+	private void noProfile(@NotNull CommandSender sender) {
+		Utils.sendMessage(sender, this.plugin.config().messageNotFoundProfile());
 	}
 
 	@Nullable
@@ -245,10 +256,6 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 		} catch (Exception e) {
 			return null;
 		}
-	}
-
-	private boolean hasAdvancedPermission(@NotNull CommandSender sender) {
-		return sender.hasPermission(PERMISSION_ADVANCED);
 	}
 
 	public void reload() {

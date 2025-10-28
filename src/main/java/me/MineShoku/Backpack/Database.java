@@ -90,22 +90,17 @@ public abstract class Database {
 	}
 
 	public final void close() {
-		if (hikari == null) return;
-		hikari.close();
-		hikari = null;
-	}
-
-	private void connect() {
-		if (this.hikari == null || this.hikari.isClosed()) {
-			this.hikari = new HikariDataSource(this.hikariConfig);
-		}
+		if (this.hikari == null) return;
+		this.hikari.close();
+		this.hikari = null;
 	}
 
 	@NotNull
 	public final Connection getConnection() throws SQLException {
-		connect();
-		assert hikari != null;
-		return hikari.getConnection();
+		if (this.hikari == null || this.hikari.isClosed()) {
+			this.hikari = new HikariDataSource(this.hikariConfig);
+		}
+		return this.hikari.getConnection();
 	}
 
 	@NonNegative

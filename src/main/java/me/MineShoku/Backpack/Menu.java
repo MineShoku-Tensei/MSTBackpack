@@ -354,7 +354,9 @@ public class Menu implements Listener {
 		}), this.plugin, success -> {
 			if (!this.player.isOnline()) return;
 			if (success) {
-				this.player.saveData();
+				try {
+					this.player.saveData();
+				} catch (Exception ignored) {}
 			} else {
 				this.player.getInventory().setContents(this.playerInitialItems);
 			}

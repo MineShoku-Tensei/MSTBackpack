@@ -4,7 +4,7 @@ import com.zaxxer.hikari.pool.HikariPool;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public final class Main extends JavaPlugin {
+public class Main extends JavaPlugin {
 	private Config config;
 	private Database database;
 	private CommandHandler commandHandler;

@@ -359,9 +359,15 @@ public final class Config {
 			ItemStack item = ItemStack.of(this.material);
 			item.editMeta(meta -> {
 				meta.itemName(placeholdersPages(this.name, currentPage, totalPages, extrasPlayer, extrasProfile, extrasPlayerMax, extrasProfileMax));
-				meta.lore(this.lore == null ? null : this.lore.stream().map(str -> str == null ? Component.empty() : placeholdersPages(str, currentPage, totalPages, extrasPlayer, extrasProfile, extrasPlayerMax, extrasProfileMax)).toList());
-				meta.setItemModel(this.model);
-				meta.setCustomModelData(this.customModel);
+				if (this.lore != null) {
+					meta.lore(this.lore.stream().map(str -> str == null ? Component.empty() : placeholdersPages(str, currentPage, totalPages, extrasPlayer, extrasProfile, extrasPlayerMax, extrasProfileMax)).toList());
+				}
+				if (this.model != null) {
+					meta.setItemModel(this.model);
+				}
+				if (this.customModel != null) {
+					meta.setCustomModelData(this.customModel);
+				}
 			});
 			return item;
 		}
