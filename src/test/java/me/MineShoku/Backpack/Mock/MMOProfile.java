@@ -51,4 +51,8 @@ public class MMOProfile implements ProfileList<MMOPlayerProfile>, NotFullyImplem
 	public void setCurrentProfile(@Nullable UUID uuid) {
 		this.currentProfile = getProfile(uuid);
 	}
+
+	public void setCurrentProfileIfNotSet() {
+		setCurrentProfile(this.profiles.values().iterator().next().getUniqueId());
+	}
 }

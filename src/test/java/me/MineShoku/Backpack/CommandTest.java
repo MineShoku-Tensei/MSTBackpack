@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class MainTest {
+public class CommandTest {
 	private static final String COMMAND = "backpack";
 	private static final String PERMISSION = "mst.backpack.use";
 
@@ -82,7 +82,7 @@ public class MainTest {
 	}
 
 	@Test
-	void tabCompleteCorrect() {
+	void tabCompleteBase() {
 		assertLinesMatch(CommandHandler.BASE, this.server.getCommandTabComplete(this.server.getConsoleSender(), cmd(true)));
 		CommandHandler.BASE.stream().map(str -> str.charAt(0)).forEach(c -> assertSame(1, this.server.getCommandTabComplete(this.server.getConsoleSender(), cmd(false, c)).size()));
 		PlayerMock player1 = addPlayer(), player2 = addPlayer();
@@ -92,18 +92,63 @@ public class MainTest {
 		assertLinesMatch(Collections.emptyList(), this.server.getCommandTabComplete(player2, cmd(true)));
 		CommandHandler.BASE.stream().map(str -> str.charAt(0)).forEach(c -> assertSame(1, this.server.getCommandTabComplete(player1, cmd(false, c)).size()));
 		CommandHandler.BASE.stream().map(str -> str.charAt(0)).forEach(c -> assertSame(0, this.server.getCommandTabComplete(player2, cmd(false, c)).size()));
-		List<String> withPlayers = CommandHandler.BASE.subList(2, CommandHandler.BASE.size());
-		CommandHandler.BASE.subList(0, 2).forEach(sub -> assertSame(0, this.server.getCommandTabComplete(player1, cmd(true, sub)).size()));
+	}
+
+	void tabCompleteSubSimpleCheck(@NotNull String sub) {
+		PlayerMock player1 = addPlayer();
+		PermissionAttachment attachment = player1.addAttachment(this.plugin);
+		attachment.setPermission(CommandHandler.PERMISSION_ADVANCED, true);
+		assertSame(0, this.server.getCommandTabComplete(player1, cmd(true, sub)).size());
+	}
+
+	@Test
+	void tabCompleteHelp() {
+		tabCompleteSubSimpleCheck("help");
+	}
+
+	@Test
+	void tabCompleteReload() {
+		tabCompleteSubSimpleCheck("reload");
+	}
+
+	void tabCompleteSubAdvancedCheck(@NotNull String sub, boolean hasOptionNoProfile) {
+		PlayerMock player1 = addPlayer(), player2 = addPlayer();
+		PermissionAttachment attachment = player1.addAttachment(this.plugin);
+		attachment.setPermission(CommandHandler.PERMISSION_ADVANCED, true);
 		disconnect(player2);
-		withPlayers.forEach(sub -> assertSame(2, this.server.getCommandTabComplete(player1, cmd(true, sub)).size()));
-		withPlayers.forEach(sub -> assertSame(2, this.server.getCommandTabComplete(player1, cmd(true, sub)).size()));
-		addProfiles(player1, 4);
-		List<String> withoutPlayer = withPlayers.subList(0, 2), withPlayer = withPlayers.subList(2, withPlayers.size());
-		withoutPlayer.forEach(sub -> assertSame(5, this.server.getCommandTabComplete(player1, cmd(true, sub, ".")).size()));
-		withoutPlayer.forEach(sub -> assertSame(0, this.server.getCommandTabComplete(player1, cmd(true, sub, player2.getName())).size()));
-		withPlayer.forEach(sub -> assertSame(0, this.server.getCommandTabComplete(player1, cmd(true, sub, "aaaa")).size()));
-		withPlayer.forEach(sub -> assertSame(6, this.server.getCommandTabComplete(player1, cmd(true, sub, ".")).size()));
-		withPlayer.forEach(sub -> assertSame(1, this.server.getCommandTabComplete(player1, cmd(true, sub, player2.getUniqueId())).size()));
+		assertLinesMatch(List.of(CommandHandler.EXTRAS_CURRENT, player1.getName()), this.server.getCommandTabComplete(player1, cmd(true, sub)));
+		int profiles = 4;
+		addProfiles(player1, profiles);
+		List<String> result = this.profileProvider.getPlayerData(player1.getUniqueId()).getProfiles().stream().map(MMOPlayerProfile::getUniqueId).map(UUID::toString).collect(Collectors.toList()),
+				setPlayer = hasOptionNoProfile ? List.of(CommandHandler.EXTRAS_SET_PLAYER) : Collections.emptyList();
+		result.add(CommandHandler.EXTRAS_CURRENT);
+		if (hasOptionNoProfile) {
+			result.add(CommandHandler.EXTRAS_SET_PLAYER);
+		}
+		assertLinesMatch(result, this.server.getCommandTabComplete(player1, cmd(true, sub, CommandHandler.EXTRAS_CURRENT)));
+		assertLinesMatch(setPlayer, this.server.getCommandTabComplete(player1, cmd(true, sub, player2.getName())));
+		assertLinesMatch(setPlayer, this.server.getCommandTabComplete(player1, cmd(true, sub, player2.getUniqueId())));
+		assertSame(0, this.server.getCommandTabComplete(player1, cmd(true, sub, "aaaa")).size());
+	}
+
+	@Test
+	void tabCompleteOpen() {
+		tabCompleteSubAdvancedCheck("open", false);
+	}
+
+	@Test
+	void tabCompleteClear() {
+		tabCompleteSubAdvancedCheck("clear", false);
+	}
+
+	@Test
+	void tabCompleteUpgrade() {
+		tabCompleteSubAdvancedCheck("upgrade", true);
+	}
+
+	@Test
+	void tabCompleteDowngrade() {
+		tabCompleteSubAdvancedCheck("downgrade", true);
 	}
 
 	void performCommandWithAsync(@NotNull PlayerMock player, @NotNull String command) throws InterruptedException {
@@ -113,19 +158,24 @@ public class MainTest {
 	}
 
 	@Test
-	void commandRunsCorrectly() throws InterruptedException {
+	void commandRunBase() throws InterruptedException {
 		PlayerMock player1 = addPlayer(), player2 = addPlayer();
 		PermissionAttachment attachment = player1.addAttachment(this.plugin);
 		attachment.setPermission(PERMISSION, true);
 		addProfiles(player1, 2);
-		MMOProfile playerData = this.profileProvider.getPlayerData(player1.getUniqueId());
-		playerData.setCurrentProfile(playerData.getProfiles().getFirst().getUniqueId());
+		this.profileProvider.getPlayerData(player1.getUniqueId()).setCurrentProfileIfNotSet();
 		performCommandWithAsync(player1, COMMAND);
 		assertNotNull(player1.getOpenInventory().getTopInventory());
 		assertSame(InventoryType.CHEST, player1.getOpenInventory().getType());
-		player1.closeInventory();
 		performCommandWithAsync(player2, COMMAND);
 		assertSame(InventoryType.CRAFTING, player2.getOpenInventory().getType());
+	}
+
+	@Test
+	void commandRunOpen() throws InterruptedException {
+		PlayerMock player1 = addPlayer();
+		this.profileProvider.getPlayerData(player1.getUniqueId()).setCurrentProfileIfNotSet();
+		PermissionAttachment attachment = player1.addAttachment(this.plugin);
 		assertTrue(player1.performCommand(cmd(false, "open", ".", ".")));
 		assertSame(InventoryType.CRAFTING, player1.getOpenInventory().getType());
 		attachment.setPermission(CommandHandler.PERMISSION_ADVANCED, true);

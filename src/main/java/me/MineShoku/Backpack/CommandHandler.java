@@ -21,8 +21,8 @@ import java.util.stream.Stream;
 public final class CommandHandler implements CommandExecutor, TabCompleter {
 	public static final @NotNull @Unmodifiable List<@NotNull String> BASE = List.of("help", "reload", "open", "clear", "upgrade", "downgrade");
 	public static final @NotNull String PERMISSION_ADVANCED = "mst.backpack.advanced";
-	private static final @NotNull String EXTRAS_SET_PLAYER = "-";
-	private static final @NotNull String EXTRAS_CURRENT = ".";
+	public static final @NotNull String EXTRAS_SET_PLAYER = "-";
+	public static final @NotNull String EXTRAS_CURRENT = ".";
 	private static final @Positive int INDEX_OPEN = BASE.indexOf("open");
 	private static final @Positive int INDEX_CLEAR = BASE.indexOf("clear");
 	private static final @Positive int INDEX_UPGRADE = BASE.indexOf("upgrade");
