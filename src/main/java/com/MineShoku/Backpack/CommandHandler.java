@@ -1,4 +1,4 @@
-package me.MineShoku.Backpack;
+package com.MineShoku.Backpack;
 
 import fr.phoenixdevt.profiles.PlayerProfile;
 import fr.phoenixdevt.profiles.ProfileList;

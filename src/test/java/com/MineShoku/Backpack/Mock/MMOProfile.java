@@ -1,7 +1,7 @@
-package me.MineShoku.Backpack.Mock;
+package com.MineShoku.Backpack.Mock;
 
 import fr.phoenixdevt.profiles.ProfileList;
-import me.MineShoku.Backpack.NotFullyImplemented;
+import com.MineShoku.Backpack.NotFullyImplemented;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

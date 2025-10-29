@@ -1,4 +1,4 @@
-package me.MineShoku.Backpack;
+package com.MineShoku.Backpack;
 
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;

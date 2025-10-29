@@ -1,4 +1,4 @@
-package me.MineShoku.Backpack;
+package com.MineShoku.Backpack;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
