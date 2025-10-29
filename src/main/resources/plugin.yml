@@ -14,10 +14,11 @@ permissions:
         default: false
     mst.backpack.advanced:
         default: false
+        children:
+            mst.backpack.use: true
     mst.backpack.*:
         default: false
         children:
-            mst.backpack.use: true
             mst.backpack.advanced: true
     mst.backpack:
         default: op
