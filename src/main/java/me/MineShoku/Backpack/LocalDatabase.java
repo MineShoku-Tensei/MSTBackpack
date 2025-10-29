@@ -1,4 +1,4 @@
-package me.DMan16;
+package me.MineShoku.Backpack;
 
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
@@ -10,7 +10,7 @@ import java.sql.SQLException;
 public final class LocalDatabase extends Database {
 	private final @NotNull File file;
 
-	public LocalDatabase(@NotNull JavaPlugin plugin) throws ClassNotFoundException, IOException, SQLException {
+	public LocalDatabase(@NotNull Main plugin) throws ClassNotFoundException, IOException, SQLException {
 		super(createURL(createFile(plugin)), null, null);
 		this.file = createFile(plugin);
 		initiateDatabase();
@@ -33,16 +33,28 @@ public final class LocalDatabase extends Database {
 	}
 
 	private void initiateDatabase() throws IOException {
-		if (!this.file.exists()) {
-			if (!this.file.createNewFile()) {
-				throw new IOException("Couldn't create local DB file \"" + file + "\"");
-			}
+		if (!this.file.exists() && !this.file.createNewFile()) {
+			throw new IOException("Couldn't create local DB file \"" + file + "\"");
 		}
 	}
 
-	@Override
 	@NotNull
-	protected String onConflictUpdateItems() {
-		return "ON CONFLICT(PlayerUUID, ProfileUUID) DO UPDATE SET Items=excluded.Items";
+	protected String onConflictPrefix(@NotNull String @NotNull ... keys) {
+		return "ON CONFLICT(" + String.join(", ", keys) + ") DO UPDATE SET";
+	}
+
+	@NotNull
+	protected String fromConflict(@NotNull String column) {
+		return "excluded." + column;
+	}
+
+	@NotNull
+	protected String functionMin() {
+		return "MIN";
+	}
+
+	@NotNull
+	protected String functionMax() {
+		return "MAX";
 	}
 }

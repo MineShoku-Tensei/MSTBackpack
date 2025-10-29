@@ -1,0 +1,123 @@
+name: Build
+
+on:
+    pull_request:
+        branches:
+            - master
+        types:
+            - closed
+    workflow_dispatch:
+        inputs:
+            release:
+                description: "Create a release"
+                required: false
+                default: false
+                type: boolean
+
+env:
+    PROJECT_NAME: MSTBackpack
+    JAR_REGEX: MSTBackpack-*.jar
+
+permissions:
+    contents: write
+    actions: write
+
+jobs:
+    build:
+        if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
+        runs-on: ubuntu-latest
+        outputs:
+            version: ${{ steps.get_version.outputs.version }}
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0  # needed for git info plugins like git-commit-id-plugin
+
+            - name: Extract project version from POM
+              id: get_version
+              uses: dostonhamrakulov/maven-artifact-version-extractor@v1.0
+              with:
+                  file_path: ${{ github.workspace }}/pom.xml
+
+            - name: Set up Java 21
+              uses: actions/setup-java@v4
+              with:
+                  java-version: '21'
+                  distribution: 'temurin'
+                  cache: maven
+
+            - name: Build with Maven
+              run: mvn -B clean package
+
+            - name: Find built JAR
+              id: jar
+              run: echo "jar_file=$(find . -maxdepth 1 -type f -name '${{ env.JAR_REGEX }}' | head -n 1)" >> "$GITHUB_OUTPUT"
+
+            - name: Rename master JAR
+              if: github.ref == 'refs/heads/master'
+              id: jar_master
+              run: |
+                  renamed_jar_file="$(dirname "${{ steps.jar.outputs.jar_file }}")/${{ env.PROJECT_NAME }}-${{ steps.get_version.outputs.version }}.jar"
+                  mv -f "${{ steps.jar.outputs.jar_file }}" "$renamed_jar_file"
+                  echo "jar_file=$renamed_jar_file" >> "$GITHUB_OUTPUT"
+
+            - name: Set final JAR path
+              id: jar_final
+              run: |
+                  if [ "${{ steps.jar_master.outcome }}" = "success" ]; then
+                    echo "jar_file=${{ steps.jar_master.outputs.jar_file }}" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "jar_file=${{ steps.jar.outputs.jar_file }}" >> "$GITHUB_OUTPUT"
+                  fi
+
+            - name: Upload JAR as artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: build-${{ github.ref_name }}
+                  path: ${{ steps.jar_final.outputs.jar_file }}
+                  overwrite: false
+                  if-no-files-found: error
+                  retention-days: 2
+
+    release:
+        if: |
+            github.ref == 'refs/heads/master' &&
+            (
+                (github.event_name == 'workflow_dispatch' && inputs.release == true) ||
+                (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+            )
+        permissions: write-all
+        needs: build
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check if release already exists
+              id: check_release
+              uses: action-pack/tag-exists@v1
+              with:
+                  tag: "v${{ needs.build.outputs.version }}"
+
+            - name: Fail if version already released
+              if: steps.check_release.outputs.exists == 'true'
+              run: |
+                  echo "Release tag v${{ needs.build.outputs.version }} already exists"
+                  exit 1
+
+            - name: Download built artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: build-master
+
+            - name: Create GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: "v${{ needs.build.outputs.version }}"
+                  name: "v${{ needs.build.outputs.version }}"
+                  body: |
+                      🚀 **v${{ needs.build.outputs.version }}**
+
+                  files: ${{ env.JAR_REGEX }}
+                  overwrite_files: false
+                  fail_on_unmatched_files: true
+                  generate_release_notes: true

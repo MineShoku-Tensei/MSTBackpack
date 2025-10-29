@@ -3,10 +3,10 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>me.DMan16</groupId>
-    <artifactId>MineShokuTenseiBackpack</artifactId>
-    <description>MineShoku Tensei backpack plugin by DMan16</description>
-    <version>1.0</version>
+    <groupId>me.MineShoku</groupId>
+    <artifactId>MSTBackpack</artifactId>
+    <description>MineShoku Tensei backpack plugin</description>
+    <version>2.0</version>
     <packaging>jar</packaging>
     <developers>
         <developer>
@@ -45,7 +45,28 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <finalName>${project.name}</finalName>
+                    <finalName>${project.name}-${project.version}-${git.commit.id.abbrev}</finalName>
+                    <outputDirectory>.</outputDirectory>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>io.github.git-commit-id</groupId>
+                <artifactId>git-commit-id-maven-plugin</artifactId>
+                <version>9.0.2</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>revision</goal>
+                        </goals>
+                        <phase>initialize</phase>
+                    </execution>
+                </executions>
+                <configuration>
+                    <generateGitPropertiesFile>false</generateGitPropertiesFile>
+                    <skipPoms>true</skipPoms>
+                    <includeOnlyProperties>
+                        <includeOnlyProperty>git.commit.id.abbrev</includeOnlyProperty>
+                    </includeOnlyProperties>
                 </configuration>
             </plugin>
             <plugin>
@@ -73,52 +94,15 @@
                 </executions>
             </plugin>
         </plugins>
-        <pluginManagement>
-            <plugins>
-                <plugin>
-                    <groupId>net.md-5</groupId>
-                    <artifactId>specialsource-maven-plugin</artifactId>
-                    <version>1.2.3</version>
-                    <executions>
-                        <execution>
-                            <phase>package</phase>
-                            <goals>
-                                <goal>remap</goal>
-                            </goals>
-                            <id>remap-obf</id>
-                            <configuration>
-                                <srgIn>org.spigotmc:minecraft-server:${minecraft.version}:txt:maps-mojang</srgIn>
-                                <reverse>true</reverse>
-                                <remappedDependencies>org.spigotmc:spigot:${minecraft.version}:jar:remapped-mojang</remappedDependencies>
-                                <remappedArtifactAttached>true</remappedArtifactAttached>
-                                <remappedClassifierName>remapped-obf</remappedClassifierName>
-                            </configuration>
-                        </execution>
-                        <execution>
-                            <phase>package</phase>
-                            <goals>
-                                <goal>remap</goal>
-                            </goals>
-                            <id>remap-spigot</id>
-                            <configuration>
-                                <inputFile>${project.build.directory}/${project.artifactId}-${project.version}-remapped-obf.jar</inputFile>
-                                <srgIn>org.spigotmc:minecraft-server:${minecraft.version}:csrg:maps-spigot</srgIn>
-                                <remappedDependencies>org.spigotmc:spigot:${minecraft.version}:jar:remapped-obf</remappedDependencies>
-                            </configuration>
-                        </execution>
-                    </executions>
-                </plugin>
-            </plugins>
-        </pluginManagement>
     </build>
     <repositories>
-        <repository><!--Mojang Libs-->
-            <id>mojang</id>
-            <url>https://libraries.minecraft.net/</url>
-        </repository>
         <repository><!--PaperMC-->
             <id>papermc</id>
             <url>https://repo.papermc.io/repository/maven-public/</url>
+        </repository>
+        <repository><!--Mojang Libs-->
+            <id>mojang</id>
+            <url>https://libraries.minecraft.net/</url>
         </repository>
         <repository><!--MMOProfile-->
             <id>phoenix</id>
@@ -133,40 +117,15 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>org.jetbrains</groupId>
-            <artifactId>annotations</artifactId>
-            <version>24.0.1</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
             <version>5.0.1</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
-            <groupId>org.checkerframework</groupId>
-            <artifactId>checker-qual</artifactId>
-            <version>3.49.2</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
             <version>${minecraft.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.bukkit</groupId>
-            <artifactId>bukkit</artifactId>
-            <version>${minecraft.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.spigotmc</groupId>
-            <artifactId>spigot</artifactId>
-            <version>${minecraft.version}</version>
-            <classifier>remapped-mojang</classifier>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -180,6 +139,18 @@
             <artifactId>Profile-API</artifactId>
             <version>1.1</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockbukkit.mockbukkit</groupId>
+            <artifactId>mockbukkit-v1.21</artifactId>
+            <version>4.45.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.47.0.0</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>
