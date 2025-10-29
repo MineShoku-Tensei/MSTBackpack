@@ -1,4 +1,4 @@
-package me.MineShoku.Backpack;
+package com.MineShoku.Backpack;
 
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;

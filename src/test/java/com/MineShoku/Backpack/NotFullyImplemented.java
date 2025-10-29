@@ -1,4 +1,4 @@
-package me.MineShoku.Backpack;
+package com.MineShoku.Backpack;
 
 public interface NotFullyImplemented {
 	default  <V> V notImplemented() {
