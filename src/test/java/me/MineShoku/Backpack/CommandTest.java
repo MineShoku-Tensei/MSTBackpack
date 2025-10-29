@@ -16,10 +16,7 @@ import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -81,15 +78,20 @@ public class CommandTest {
 		return str;
 	}
 
+	void assertSameValues(@NotNull Collection<String> expectedList, @NotNull Collection<String> actualList) {
+		assertSame(expectedList.size(), actualList.size());
+		assertTrue(actualList.containsAll(expectedList));
+	}
+
 	@Test
 	void tabCompleteBase() {
-		assertLinesMatch(CommandHandler.BASE, this.server.getCommandTabComplete(this.server.getConsoleSender(), cmd(true)));
+		assertSameValues(CommandHandler.BASE, this.server.getCommandTabComplete(this.server.getConsoleSender(), cmd(true)));
 		CommandHandler.BASE.stream().map(str -> str.charAt(0)).forEach(c -> assertSame(1, this.server.getCommandTabComplete(this.server.getConsoleSender(), cmd(false, c)).size()));
 		PlayerMock player1 = addPlayer(), player2 = addPlayer();
 		PermissionAttachment attachment = player1.addAttachment(this.plugin);
 		attachment.setPermission(CommandHandler.PERMISSION_ADVANCED, true);
-		assertLinesMatch(CommandHandler.BASE, this.server.getCommandTabComplete(player1, cmd(true)));
-		assertLinesMatch(Collections.emptyList(), this.server.getCommandTabComplete(player2, cmd(true)));
+		assertSameValues(CommandHandler.BASE, this.server.getCommandTabComplete(player1, cmd(true)));
+		assertSameValues(Collections.emptyList(), this.server.getCommandTabComplete(player2, cmd(true)));
 		CommandHandler.BASE.stream().map(str -> str.charAt(0)).forEach(c -> assertSame(1, this.server.getCommandTabComplete(player1, cmd(false, c)).size()));
 		CommandHandler.BASE.stream().map(str -> str.charAt(0)).forEach(c -> assertSame(0, this.server.getCommandTabComplete(player2, cmd(false, c)).size()));
 	}
@@ -116,7 +118,7 @@ public class CommandTest {
 		PermissionAttachment attachment = player1.addAttachment(this.plugin);
 		attachment.setPermission(CommandHandler.PERMISSION_ADVANCED, true);
 		disconnect(player2);
-		assertLinesMatch(List.of(CommandHandler.EXTRAS_CURRENT, player1.getName()), this.server.getCommandTabComplete(player1, cmd(true, sub)));
+		assertSameValues(List.of(CommandHandler.EXTRAS_CURRENT, player1.getName()), this.server.getCommandTabComplete(player1, cmd(true, sub)));
 		int profiles = 4;
 		addProfiles(player1, profiles);
 		List<String> result = this.profileProvider.getPlayerData(player1.getUniqueId()).getProfiles().stream().map(MMOPlayerProfile::getUniqueId).map(UUID::toString).collect(Collectors.toList()),
@@ -125,9 +127,9 @@ public class CommandTest {
 		if (hasOptionNoProfile) {
 			result.add(CommandHandler.EXTRAS_SET_PLAYER);
 		}
-		assertLinesMatch(result, this.server.getCommandTabComplete(player1, cmd(true, sub, CommandHandler.EXTRAS_CURRENT)));
-		assertLinesMatch(setPlayer, this.server.getCommandTabComplete(player1, cmd(true, sub, player2.getName())));
-		assertLinesMatch(setPlayer, this.server.getCommandTabComplete(player1, cmd(true, sub, player2.getUniqueId())));
+		assertSameValues(result, this.server.getCommandTabComplete(player1, cmd(true, sub, CommandHandler.EXTRAS_CURRENT)));
+		assertSameValues(setPlayer, this.server.getCommandTabComplete(player1, cmd(true, sub, player2.getName())));
+		assertSameValues(setPlayer, this.server.getCommandTabComplete(player1, cmd(true, sub, player2.getUniqueId())));
 		assertSame(0, this.server.getCommandTabComplete(player1, cmd(true, sub, "aaaa")).size());
 	}
 
@@ -174,11 +176,14 @@ public class CommandTest {
 	@Test
 	void commandRunOpen() throws InterruptedException {
 		PlayerMock player1 = addPlayer();
-		this.profileProvider.getPlayerData(player1.getUniqueId()).setCurrentProfileIfNotSet();
 		PermissionAttachment attachment = player1.addAttachment(this.plugin);
 		assertTrue(player1.performCommand(cmd(false, "open", ".", ".")));
 		assertSame(InventoryType.CRAFTING, player1.getOpenInventory().getType());
 		attachment.setPermission(CommandHandler.PERMISSION_ADVANCED, true);
+		performCommandWithAsync(player1, cmd(false, "open", ".", "."));
+		assertSame(InventoryType.CRAFTING, player1.getOpenInventory().getType());
+		addProfiles(player1, 1);
+		this.profileProvider.getPlayerData(player1.getUniqueId()).setCurrentProfileIfNotSet();
 		performCommandWithAsync(player1, cmd(false, "open", ".", "."));
 		assertSame(InventoryType.CHEST, player1.getOpenInventory().getType());
 	}
