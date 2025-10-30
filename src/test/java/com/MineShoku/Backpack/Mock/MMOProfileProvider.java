@@ -1,9 +1,9 @@
 package com.MineShoku.Backpack.Mock;
 
+import com.MineShoku.Backpack.NotFullyImplemented;
 import fr.phoenixdevt.profiles.ProfileDataModule;
 import fr.phoenixdevt.profiles.ProfileProvider;
 import fr.phoenixdevt.profiles.placeholder.PlaceholderProcessor;
-import com.MineShoku.Backpack.NotFullyImplemented;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;

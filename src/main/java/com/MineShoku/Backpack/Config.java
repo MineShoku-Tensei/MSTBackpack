@@ -1,6 +1,11 @@
 package com.MineShoku.Backpack;
 
+import com.MineShoku.Utils.MathUtils;
+import com.MineShoku.Utils.TextUtils;
+import com.MineShoku.Utils.Utils;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.tag.Tag;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.OfflinePlayer;
@@ -19,17 +24,15 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
-import java.util.regex.Matcher;
 
 public final class Config {
-	private static final @NotNull String PLACEHOLDER_PLAYER_ID = "%player_id%";
-	private static final @NotNull String PLACEHOLDER_PLAYER_NAME = "%player_name%";
-	private static final @NotNull String PLACEHOLDER_PROFILE_ID = "%profile_id%";
-	private static final @NotNull String PLACEHOLDER_EXTRAS = "%extras%";
-	private static final @NotNull String PLACEHOLDER_EXTRAS_MAX = "%extras_max%";
-	private static final @NotNull String PLACEHOLDER_TOTAL = "%total%";
-	private static final @NotNull String PLACEHOLDER_TOTAL_MAX = "%total_max%";
+	private static final @NotNull String PLACEHOLDER_PLAYER_ID = "player_id";
+	private static final @NotNull String PLACEHOLDER_PLAYER_NAME = "player_name";
+	private static final @NotNull String PLACEHOLDER_PROFILE_ID = "profile_id";
+	private static final @NotNull String PLACEHOLDER_EXTRAS = "extras";
+	private static final @NotNull String PLACEHOLDER_EXTRAS_MAX = "extras_max";
+	private static final @NotNull String PLACEHOLDER_TOTAL = "total";
+	private static final @NotNull String PLACEHOLDER_TOTAL_MAX = "total_max";
 
 	private final @NotNull Main plugin;
 	private final @NotNull Configuration defaults;
@@ -110,7 +113,7 @@ public final class Config {
 		this.amountExtraProfilePer = getIntNonNegative("backpack.extra.profile.per");
 		int clearTimeout = getIntNonNegative("backpack.clear_resend_seconds");
 		this.clearTimeout = clearTimeout == 0 ? 0 : TimeUnit.SECONDS.toMillis(clearTimeout);
-		this.menuTitle = Utils.toComponentMiniMessage(getStringOrNull("backpack.menu.title"));
+		this.menuTitle = Utils.toRichComponent(getStringOrNull("backpack.menu.title"));
 		this.menuBorder = config().getBoolean("backpack.menu.border", true);
 		this.menuShowUnlockable = config().getBoolean("backpack.menu.show_unlockable", true);
 		this.menuIndicator = PageItem.fromConfig(config().getConfigurationSection("backpack.menu.item.indicator"), null);
@@ -119,16 +122,16 @@ public final class Config {
 		this.menuPrevious = PageItem.fromConfig(config().getConfigurationSection("backpack.menu.item.previous"), this.defaults);
 		this.menuBorderStatic = PageItem.fromConfig(config().getConfigurationSection("backpack.menu.item.border.regular"), this.defaults);
 		this.menuBorderUnlockable = PageItem.fromConfig(config().getConfigurationSection("backpack.menu.item.border.unlockable"), this.defaults);
-		this.messageCommandFailed = Utils.toComponentMiniMessage(getStringOrNull("backpack.message.command_failed"));
-		this.messageNotFoundPlayer = Utils.toComponentMiniMessage(getStringOrNull("backpack.message.not_found.player"));
-		this.messageNotFoundProfile = Utils.toComponentMiniMessage(getStringOrNull("backpack.message.not_found.profile"));
+		this.messageCommandFailed = Utils.toRichComponent(getStringOrNull("backpack.message.command_failed"));
+		this.messageNotFoundPlayer = Utils.toRichComponent(getStringOrNull("backpack.message.not_found.player"));
+		this.messageNotFoundProfile = Utils.toRichComponent(getStringOrNull("backpack.message.not_found.profile"));
 		this.messageClearResend = getStringOrNull("backpack.message.clear.resend");
 		this.messageClearFinish = getStringOrNull("backpack.message.clear.finish");
 		this.messageExtrasSetPlayer = getStringOrNull("backpack.message.extras_set.player");
 		this.messageExtrasSetProfile = getStringOrNull("backpack.message.extras_set.profile");
-		this.messageProfileNotSelected = Utils.toComponentMiniMessage(getStringOrNull("backpack.message.profile_not_selected"));
-		this.messageOpenFail = Utils.toComponentMiniMessage(getStringOrNull("backpack.message.open_fail"));
-		this.messageReloaded = Utils.toComponentMiniMessage(getStringOrNull("backpack.message.reloaded"));
+		this.messageProfileNotSelected = Utils.toRichComponent(getStringOrNull("backpack.message.profile_not_selected"));
+		this.messageOpenFail = Utils.toRichComponent(getStringOrNull("backpack.message.open_fail"));
+		this.messageReloaded = Utils.toRichComponent(getStringOrNull("backpack.message.reloaded"));
 		this.commandUsage = getStringOrNull("backpack.command.usage");
 		this.commandDescription = getStringOrNull("backpack.command.description");
 	}
@@ -179,6 +182,11 @@ public final class Config {
 	@NonNegative
 	public int amountExtraProfileMax() {
 		return this.amountExtraProfileMax;
+	}
+
+	@NonNegative
+	public int amountExtrasMax() {
+		return amountExtraPlayerMax() + amountExtraProfileMax();
 	}
 
 	@NonNegative
@@ -261,46 +269,55 @@ public final class Config {
 		return this.messageNotFoundProfile;
 	}
 
-	@Nullable
-	private String placeholdersPlayer(@Nullable String str, @NotNull OfflinePlayer offlinePlayer) {
-		str = Utils.replacePlaceholders(str, PLACEHOLDER_PLAYER_ID, offlinePlayer.getUniqueId());
-		str = Utils.replacePlaceholders(str, PLACEHOLDER_PLAYER_NAME, Objects.requireNonNull(offlinePlayer.getName()));
-		return str;
+	@NotNull
+	private TagResolver tagResolverPlayer(@NotNull OfflinePlayer offlinePlayer) {
+		return TagResolver.resolver(
+				Utils.unparsedPlaceholder(PLACEHOLDER_PLAYER_NAME, Objects.requireNonNull(offlinePlayer.getName())),
+				Utils.unparsedPlaceholder(PLACEHOLDER_PLAYER_ID, offlinePlayer.getUniqueId())
+		);
 	}
 
-	@Nullable
-	private String placeholdersPlayerProfile(@Nullable String str, @NotNull OfflinePlayer offlinePlayer, @NotNull UUID profileID) {
-		str = placeholdersPlayer(str, offlinePlayer);
-		str = Utils.replacePlaceholders(str, PLACEHOLDER_PROFILE_ID, profileID);
-		return str;
+	@NotNull
+	private TagResolver tagResolverPlayerProfile(@NotNull OfflinePlayer offlinePlayer, @NotNull UUID profileID) {
+		return TagResolver.resolver(
+				tagResolverPlayer(offlinePlayer),
+				Utils.unparsedPlaceholder(PLACEHOLDER_PROFILE_ID, profileID)
+		);
 	}
 
 	@Nullable
 	public Component messageClearResend(@NotNull OfflinePlayer offlinePlayer, @NotNull UUID profileID) {
-		return Utils.toComponentMiniMessage(placeholdersPlayerProfile(this.messageClearResend, offlinePlayer, profileID));
+		return this.messageClearResend == null ? null :
+				Utils.toRichComponent(this.messageClearResend, tagResolverPlayerProfile(offlinePlayer, profileID));
 	}
 
 	@Nullable
 	public Component messageClearFinish(@NotNull OfflinePlayer offlinePlayer, @NotNull UUID profileID) {
-		return Utils.toComponentMiniMessage(placeholdersPlayerProfile(this.messageClearFinish, offlinePlayer, profileID));
+		return this.messageClearFinish == null ? null :
+				Utils.toRichComponent(this.messageClearFinish, tagResolverPlayerProfile(offlinePlayer, profileID));
 	}
 
 	@Nullable
 	public Component messageExtrasSetPlayer(@NotNull OfflinePlayer offlinePlayer, @NonNegative int extrasPlayer) {
-		String msg = placeholdersPlayer(this.messageExtrasSetPlayer, offlinePlayer);
-		msg = Utils.replacePlaceholders(msg, PLACEHOLDER_EXTRAS, extrasPlayer);
-		msg = Utils.replacePlaceholders(msg, PLACEHOLDER_EXTRAS_MAX, amountExtraPlayerMax());
-		return Utils.toComponentMiniMessage(msg);
+		return this.messageExtrasSetPlayer == null ? null :
+				Utils.toRichComponent(this.messageExtrasSetPlayer,
+						tagResolverPlayer(offlinePlayer),
+						Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS, extrasPlayer),
+						Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS_MAX, amountExtraPlayerMax())
+				);
 	}
 
 	@Nullable
-	public Component messageExtrasSetProfile(@NotNull OfflinePlayer offlinePlayer, @NotNull UUID profileID, @NonNegative int extrasPlayer, @NonNegative int extrasProfile) {
-		String msg = placeholdersPlayerProfile(this.messageExtrasSetProfile, offlinePlayer, profileID);
-		msg = Utils.replacePlaceholders(msg, PLACEHOLDER_EXTRAS, extrasProfile);
-		msg = Utils.replacePlaceholders(msg, PLACEHOLDER_EXTRAS_MAX, amountExtraProfileMax());
-		msg = Utils.replacePlaceholders(msg, PLACEHOLDER_TOTAL, extrasPlayer + extrasProfile);
-		msg = Utils.replacePlaceholders(msg, PLACEHOLDER_TOTAL_MAX, amountExtraPlayerMax() + amountExtraProfileMax());
-		return Utils.toComponentMiniMessage(msg);
+	public Component messageExtrasSetProfile(@NotNull OfflinePlayer offlinePlayer, @NotNull UUID profileID,
+											 @NonNegative int extrasPlayer, @NonNegative int extrasProfile) {
+		return this.messageExtrasSetProfile == null ? null :
+				Utils.toRichComponent(this.messageExtrasSetProfile,
+						tagResolverPlayerProfile(offlinePlayer, profileID),
+						Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS, extrasProfile),
+						Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS_MAX, amountExtraProfileMax()),
+						Utils.unparsedPlaceholder(PLACEHOLDER_TOTAL, extrasPlayer + extrasProfile),
+						Utils.unparsedPlaceholder(PLACEHOLDER_TOTAL_MAX, amountExtrasMax())
+				);
 	}
 
 	@Nullable
@@ -336,31 +353,34 @@ public final class Config {
 		public static Type get(@Nullable String type) {
 			if (type == null) return PAGES;
 			try {
-				return Type.valueOf(Utils.toUpperCase(type));
+				return Type.valueOf(TextUtils.toUpperCase(type));
 			} catch (IllegalArgumentException e) {
 				return PAGES;
 			}
 		}
 	}
 
-	public record PageItem(@NotNull Material material, @Nullable String name, @Nullable @Unmodifiable List<String> lore, @Nullable NamespacedKey model, @Nullable @Positive Integer customModel, int slot) {
-		private static final @NotNull String PLACEHOLDER_PAGE = "%page(?:([+-])(\\d+))?%";
-		private static final @NotNull String PLACEHOLDER_PAGES_TOTAL = "%pages%";
-		private static final @NotNull String PLACEHOLDER_EXTRAS_PLAYER = "%extras_player%";
-		private static final @NotNull String PLACEHOLDER_EXTRAS_PLAYER_MAX = "%extras_player_max%";
-		private static final @NotNull String PLACEHOLDER_EXTRAS_PROFILE = "%extras_profile%";
-		private static final @NotNull String PLACEHOLDER_EXTRAS_PROFILE_MAX = "%extras_profile_max%";
-		private static final @NotNull String PLACEHOLDER_EXTRAS_TOTAL = "%extras_total%";
-		private static final @NotNull String PLACEHOLDER_EXTRAS_TOTAL_MAX = "%extras_total_max%";
+	public record PageItem(@NotNull Material material, @Nullable String name, @Nullable @Unmodifiable List<String> lore,
+						   @Nullable NamespacedKey model, @Nullable @Positive Integer customModel, int slot) {
+		private static final @NotNull String PLACEHOLDER_PAGE = "page";
+		private static final @NotNull String PLACEHOLDER_PAGES_TOTAL = "pages";
+		private static final @NotNull String PLACEHOLDER_EXTRAS_PLAYER = "extras_player";
+		private static final @NotNull String PLACEHOLDER_EXTRAS_PLAYER_MAX = "extras_player_max";
+		private static final @NotNull String PLACEHOLDER_EXTRAS_PROFILE = "extras_profile";
+		private static final @NotNull String PLACEHOLDER_EXTRAS_PROFILE_MAX = "extras_profile_max";
+		private static final @NotNull String PLACEHOLDER_EXTRAS_TOTAL = "extras_total";
+		private static final @NotNull String PLACEHOLDER_EXTRAS_TOTAL_MAX = "extras_total_max";
 
 		@NotNull
 		@Contract("_, _, _, _, _, _ -> new")
-		public ItemStack toItemStack(@Positive int currentPage, @NonNegative int totalPages, @NonNegative int extrasPlayer, @NonNegative int extrasProfile, @NonNegative int extrasPlayerMax, @NonNegative int extrasProfileMax) {
+		public ItemStack toItemStack(@Positive int currentPage, @NonNegative int totalPages, @NonNegative int extrasPlayer, @NonNegative int extrasProfile,
+									 @NonNegative int extrasPlayerMax, @NonNegative int extrasProfileMax) {
 			ItemStack item = ItemStack.of(this.material);
 			item.editMeta(meta -> {
-				meta.itemName(placeholdersPages(this.name, currentPage, totalPages, extrasPlayer, extrasProfile, extrasPlayerMax, extrasProfileMax));
+				meta.itemName(replace(this.name, currentPage, totalPages, extrasPlayer, extrasProfile, extrasPlayerMax, extrasProfileMax));
 				if (this.lore != null) {
-					meta.lore(this.lore.stream().map(str -> str == null ? Component.empty() : placeholdersPages(str, currentPage, totalPages, extrasPlayer, extrasProfile, extrasPlayerMax, extrasProfileMax)).toList());
+					meta.lore(this.lore.stream().
+							map(str -> replace(str, currentPage, totalPages, extrasPlayer, extrasProfile, extrasPlayerMax, extrasProfileMax)).toList());
 				}
 				if (this.model != null) {
 					meta.setItemModel(this.model);
@@ -378,9 +398,9 @@ public final class Config {
 			Objects.requireNonNull(section);
 			String type = section.getString("type", null);
 			Material material;
-			if (type == null || (material = Material.getMaterial(Utils.toUpperCase(type.replace(" ", "_")))) == null) {
+			if (type == null || (material = Material.getMaterial(TextUtils.toUpperCase(type.replace(" ", "_")))) == null) {
 				if (defaults == null) return null;
-				material = Objects.requireNonNull(Material.getMaterial(Utils.toUpperCase(Objects.requireNonNull(defaults.getString("type")))));
+				material = Objects.requireNonNull(Material.getMaterial(TextUtils.toUpperCase(Objects.requireNonNull(defaults.getString("type")))));
 			}
 			int slot;
 			if (section.contains("slot", true)) {
@@ -421,28 +441,25 @@ public final class Config {
 		}
 
 		@NotNull
-		private static Component placeholdersPages(@Nullable String str, @Positive int currentPage, @NonNegative int totalPages, @NonNegative int extrasPlayer, @NonNegative int extrasProfile, @NonNegative int extrasPlayerMax, @NonNegative int extrasProfileMax) {
-			if (str == null) return Component.empty();
-			int pages = Math.max(totalPages, 1);
-			Function<Matcher, Integer> replace = (Matcher matcher) -> {
-				String sign = matcher.group(1);
-				String number = matcher.group(2);
-				int replacement = currentPage;
-				if (sign != null && number != null) {
-					int delta = Integer.parseInt(number);
-					replacement += sign.equals("+") ? delta : -delta;
-				}
-				return Math.clamp(replacement, 1, pages);
-			};
-			str = Utils.replacePlaceholdersComplex(str, PLACEHOLDER_PAGE, replace);
-			str = Utils.replacePlaceholders(str, PLACEHOLDER_PAGES_TOTAL, totalPages);
-			str = Utils.replacePlaceholders(str, PLACEHOLDER_EXTRAS_PLAYER, extrasPlayer);
-			str = Utils.replacePlaceholders(str, PLACEHOLDER_EXTRAS_PLAYER_MAX, extrasPlayerMax);
-			str = Utils.replacePlaceholders(str, PLACEHOLDER_EXTRAS_PROFILE, extrasProfile);
-			str = Utils.replacePlaceholders(str, PLACEHOLDER_EXTRAS_PROFILE_MAX, extrasProfileMax);
-			str = Utils.replacePlaceholders(str, PLACEHOLDER_EXTRAS_TOTAL, extrasPlayer + extrasProfile);
-			str = Utils.replacePlaceholders(str, PLACEHOLDER_EXTRAS_TOTAL_MAX, extrasPlayerMax + extrasProfileMax);
-			return Utils.toComponentMiniMessage(str);
+		private static Component replace(@Nullable String str,
+										 @Positive int currentPage, @NonNegative int totalPages,
+										 @NonNegative int extrasPlayer, @NonNegative int extrasProfile,
+										 @NonNegative int extrasPlayerMax, @NonNegative int extrasProfileMax) {
+			if (str == null || str.isBlank()) return Component.empty();
+			TagResolver pageResolver = TagResolver.resolver(PLACEHOLDER_PAGE, (queue, context) -> {
+				Integer add = queue.hasNext() ? MathUtils.getInteger(queue.pop().value()) : null;
+				return Tag.preProcessParsed(String.valueOf(Math.clamp(add == null ? currentPage : currentPage + add, 1, Math.max(totalPages, 1))));
+			});
+			return Utils.toRichComponent(str,
+					pageResolver,
+					Utils.unparsedPlaceholder(PLACEHOLDER_PAGES_TOTAL, totalPages),
+					Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS_PLAYER, extrasPlayer),
+					Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS_PLAYER_MAX, extrasPlayerMax),
+					Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS_PROFILE, extrasProfile),
+					Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS_PROFILE_MAX, extrasProfileMax),
+					Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS_TOTAL, extrasPlayer + extrasProfile),
+					Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS_TOTAL_MAX, extrasPlayerMax + extrasProfileMax)
+			);
 		}
 	}
 }

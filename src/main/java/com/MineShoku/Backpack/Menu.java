@@ -1,6 +1,8 @@
 package com.MineShoku.Backpack;
 
-import org.bukkit.NamespacedKey;
+import com.MineShoku.Utils.InventoryUtils;
+import com.MineShoku.Utils.TextUtils;
+import com.MineShoku.Utils.Utils;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -14,7 +16,6 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.checkerframework.checker.index.qual.NonNegative;
 import org.checkerframework.checker.index.qual.Positive;
@@ -41,11 +42,11 @@ public class Menu implements Listener {
 	private final @NotNull Inventory inventory;
 	protected final @NotNull TreeMap<@NotNull Integer, @NotNull TreeMap<@NotNull Integer, @Nullable ItemStack>> pagesContent;
 	private final @NotNull @Unmodifiable Set<@NotNull Integer> staticBorders;
-	private final @NotNull @Unmodifiable NavigableMap<@NotNull Integer, @NotNull @Unmodifiable NavigableMap<@NotNull Integer, @NotNull Boolean>> extraPagesBorders;
+	private final @NotNull @Unmodifiable NavigableMap<@NotNull Integer, @NotNull @Unmodifiable NavigableMap<@NotNull Integer, @NotNull Boolean>> extraBorders;
 	private final @Nullable ItemStack @NotNull [] playerInitialItems;
 	private @Positive int currentPage;
 	private @Nullable TreeMap<@NotNull Integer, @Nullable ItemStack> pageContent;
-	private @Nullable @Unmodifiable NavigableMap<@NotNull Integer, @NotNull Boolean> extraPageBorders;
+	private @Nullable @Unmodifiable NavigableMap<@NotNull Integer, @NotNull Boolean> extraBorder;
 
 	public Menu(@NotNull Main plugin, @NotNull Player player, @NotNull Info info) throws NullPointerException {
 		this.plugin = plugin;
@@ -56,13 +57,16 @@ public class Menu implements Listener {
 		boolean menuShowUnlockable = this.plugin.config().menuShowUnlockable();
 		int totalSlots = totalSlots(this.plugin.config().calculateAmount(info.extrasPlayer(), info.extrasProfile()), this.type, this.topBorder),
 				totalSlotsPossibleWithExtras = totalSlots(this.plugin.config().amountTotalMax(), this.type, this.topBorder),
-				maxSlotsPerPage = Utils.slotsFromLines(Utils.INVENTORY_MAX_LINES - (this.topBorder ? 2 : 1));
+				maxSlotsPerPage = InventoryUtils.slotsFromLines(InventoryUtils.INVENTORY_MAX_LINES - (this.topBorder ? 2 : 1));
 		this.pagesContent = itemsPages(this.info.items(), this.topBorder, maxSlotsPerPage, this.plugin.config().condense());
 		this.maxPages = maxPages(totalSlots, totalSlotsPossibleWithExtras, menuShowUnlockable, maxSlotsPerPage);
-		this.inventorySize = menuShowUnlockable || this.maxPages > 1 ? Utils.INVENTORY_MAX_SIZE : Utils.slotsFromLines(Math.ceilDiv(totalSlots, Utils.LINE_SLOTS) + (this.topBorder ? 2 : 1));
-		this.extraPagesBorders = extraPagesBorders(this.topBorder, this.inventorySize, this.maxPages, totalSlots, totalSlotsPossibleWithExtras, maxSlotsPerPage);
+		int lines = menuShowUnlockable || this.maxPages > 1 ? InventoryUtils.INVENTORY_MAX_LINES :
+				Math.ceilDiv(totalSlots, InventoryUtils.LINE_SLOTS) + (this.topBorder ? 2 : 1);
+		this.inventory = InventoryUtils.inventory(this.player, lines, this.plugin.config().menuTitle());
+		this.inventorySize = this.inventory.getSize();
+		this.extraBorders = extraBorders(this.topBorder, this.inventorySize, this.maxPages,
+				totalSlots, totalSlotsPossibleWithExtras, maxSlotsPerPage);
 		this.staticBorders = staticBorders(this.topBorder, this.inventorySize);
-		this.inventory = Utils.inventory(this.player, this.inventorySize, this.plugin.config().menuTitle());
 		this.playerInitialItems = this.player.getInventory().getContents();
 		setPage(1, false);
 	}
@@ -70,8 +74,8 @@ public class Menu implements Listener {
 	@NonNegative
 	private static int totalSlots(@NonNegative int total, Config.@NotNull Type type, boolean topBorder) {
 		return switch (type) {
-			case PAGES -> Math.multiplyExact(total, Utils.slotsFromLines(Utils.INVENTORY_MAX_LINES - (topBorder ? 2 : 1)));
-			case LINES -> Math.multiplyExact(total, Utils.LINE_SLOTS);
+			case PAGES -> Math.multiplyExact(total, InventoryUtils.slotsFromLines(InventoryUtils.INVENTORY_MAX_LINES - (topBorder ? 2 : 1)));
+			case LINES -> Math.multiplyExact(total, InventoryUtils.LINE_SLOTS);
 			case SLOTS -> total;
 		};
 	}
@@ -82,11 +86,11 @@ public class Menu implements Listener {
 	private static Set<@NotNull Integer> staticBorders(boolean topBorder, @Positive int inventorySize) {
 		TreeSet<Integer> set = new TreeSet<>();
 		if (topBorder) {
-			for (int i = 0; i < Utils.LINE_SLOTS; i++) {
+			for (int i = 0; i < InventoryUtils.LINE_SLOTS; i++) {
 				set.add(i);
 			}
 		}
-		for (int i = inventorySize - Utils.LINE_SLOTS; i < inventorySize; i++) {
+		for (int i = inventorySize - InventoryUtils.LINE_SLOTS; i < inventorySize; i++) {
 			set.add(i);
 		}
 		return Collections.unmodifiableNavigableSet(set);
@@ -94,13 +98,14 @@ public class Menu implements Listener {
 
 	@NotNull
 	@Contract("_, _, _, _ -> new")
-	private static TreeMap<@NotNull Integer, @NotNull TreeMap<@NotNull Integer, @Nullable ItemStack>> itemsPages(@Nullable List<@Nullable ItemStack> items, boolean topBorder, @Positive int maxSlotsPerPage, boolean condense) {
+	private static TreeMap<@NotNull Integer, @NotNull TreeMap<@NotNull Integer, @Nullable ItemStack>>
+	itemsPages(@Nullable List<@Nullable ItemStack> items, boolean topBorder, @Positive int maxSlotsPerPage, boolean condense) {
 		TreeMap<Integer, TreeMap<Integer, ItemStack>> map = new TreeMap<>();
 		if (items == null || items.isEmpty()) return map;
 		if (condense) {
-			items = Utils.condenseItems(items);
+			items = InventoryUtils.condenseItems(items);
 		}
-		int startSlot = topBorder ? Utils.LINE_SLOTS : 0;
+		int startSlot = topBorder ? InventoryUtils.LINE_SLOTS : 0;
 		for (int slot = 0; slot < items.size(); slot++) {
 			ItemStack item = items.get(slot);
 			if (item != null) {
@@ -119,9 +124,11 @@ public class Menu implements Listener {
 	@NotNull
 	@Unmodifiable
 	@Contract("_, _, _, _, _, _ -> new")
-	private static NavigableMap<@NotNull Integer, @NotNull @Unmodifiable NavigableMap<@NotNull Integer, @NotNull Boolean>> extraPagesBorders(boolean topBorder, @Positive int inventorySize, @Positive int maxPages, @Positive int totalSlots, @NonNegative int totalSlotsPossibleWithExtras, @Positive int maxSlotsPerPage) {
+	private static NavigableMap<@NotNull Integer, @NotNull @Unmodifiable NavigableMap<@NotNull Integer, @NotNull Boolean>>
+	extraBorders(boolean topBorder, @Positive int inventorySize, @Positive int maxPages, @Positive int totalSlots,
+				 @NonNegative int totalSlotsPossibleWithExtras, @Positive int maxSlotsPerPage) {
 		Map<Integer, TreeMap<Integer, Boolean>> map = new HashMap<>();
-		int firstLine = topBorder ? Utils.LINE_SLOTS : 0, totalInventorySlots = inventorySize * maxPages;
+		int firstLine = topBorder ? InventoryUtils.LINE_SLOTS : 0, totalInventorySlots = inventorySize * maxPages;
 		for (long slot = totalSlots; slot < totalInventorySlots; slot++) {
 			int pageSlot = Math.toIntExact(slot % maxSlotsPerPage) + firstLine,
 					page = Math.toIntExact(Math.ceilDiv(slot + 1, maxSlotsPerPage));
@@ -136,7 +143,7 @@ public class Menu implements Listener {
 	@Contract("_ -> new")
 	protected final ItemStack lockItem(@NotNull ItemStack item) {
 		ItemStack clone = item.clone();
-		clone.editMeta(meta -> meta.getPersistentDataContainer().set(new NamespacedKey(this.plugin, UUID.randomUUID().toString()), PersistentDataType.STRING, Utils.randomString()));
+		clone.editMeta(meta -> Utils.setPDCString(meta, Utils.newNamespacedKey(this.plugin, UUID.randomUUID()), TextUtils.randomString()));
 		return clone;
 	}
 
@@ -171,7 +178,7 @@ public class Menu implements Listener {
 		}
 		this.currentPage = page;
 		this.pageContent = this.pagesContent.get(page);
-		this.extraPageBorders = this.extraPagesBorders.get(page);
+		this.extraBorder = this.extraBorders.get(page);
 		updateBorder();
 		fillContent();
 	}
@@ -206,8 +213,8 @@ public class Menu implements Listener {
 
 	@Nullable
 	private Boolean isExtraPageBorder(int slot) {
-		if (isStaticBorder(slot) || this.extraPageBorders == null) return null;
-		return this.extraPageBorders.get(slot);
+		if (isStaticBorder(slot) || this.extraBorder == null) return null;
+		return this.extraBorder.get(slot);
 	}
 
 	private boolean isBorder(int slot) {
@@ -224,7 +231,8 @@ public class Menu implements Listener {
 
 	@NotNull
 	private ItemStack fromConfigPageItem(Config.@NotNull PageItem pageItem) {
-		return pageItem.toItemStack(this.currentPage, this.maxPages, this.info.extrasPlayer(), this.info.extrasProfile(), this.plugin.config().amountExtraPlayerMax(), this.plugin.config().amountExtraProfileMax());
+		return pageItem.toItemStack(this.currentPage, this.maxPages, this.info.extrasPlayer(), this.info.extrasProfile(),
+				this.plugin.config().amountExtraPlayerMax(), this.plugin.config().amountExtraProfileMax());
 	}
 
 	@NonNegative
@@ -252,8 +260,8 @@ public class Menu implements Listener {
 		this.slotNext = isLegalBorder(slotNext) ? slotNext : null;
 		this.slotPrevious = isLegalBorder(slotPrevious) ? slotPrevious : null;
 		this.staticBorders.forEach(slot -> setItem(slot, lockItem(borderStatic)));
-		if (this.extraPageBorders != null) {
-			this.extraPageBorders.forEach((slot, unlockable) -> setItem(slot, lockItem(unlockable ? borderUnlockable : borderStatic)));
+		if (this.extraBorder != null) {
+			this.extraBorder.forEach((slot, unlockable) -> setItem(slot, lockItem(unlockable ? borderUnlockable : borderStatic)));
 		}
 		if (menuIndicator != null && isLegalBorder(slotIndicator = calculateSlot(menuIndicator))) {
 			setItem(slotIndicator, lockItem(fromConfigPageItem(menuIndicator)));
@@ -328,7 +336,7 @@ public class Menu implements Listener {
 	protected final void saveExit() {
 		savePage();
 		List<ItemStack> items = new ArrayList<>(), temp = new ArrayList<>();
-		int startSlot = this.topBorder ? Utils.LINE_SLOTS : 0, endSlots = this.inventorySize - Utils.LINE_SLOTS;
+		int startSlot = this.topBorder ? InventoryUtils.LINE_SLOTS : 0, endSlots = this.inventorySize - InventoryUtils.LINE_SLOTS;
 		for (int page = 1; page <= (this.pagesContent.isEmpty() ? 0 : this.pagesContent.lastKey()); page++) {
 			Map<Integer, ItemStack> pageContent = this.pagesContent.get(page);
 			for (int slot = startSlot; slot < endSlots; slot++) {
@@ -342,7 +350,7 @@ public class Menu implements Listener {
 				}
 			}
 		}
-		Info saveInfo = this.info.withItems(this.plugin.config().condense() ? Utils.condenseItems(items) : items);
+		Info saveInfo = this.info.withItems(this.plugin.config().condense() ? InventoryUtils.condenseItems(items) : items);
 		Utils.sendToSync(CompletableFuture.supplyAsync(() -> {
 			try {
 				this.plugin.database().saveItems(saveInfo);

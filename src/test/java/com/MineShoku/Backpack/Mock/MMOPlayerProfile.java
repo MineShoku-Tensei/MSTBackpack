@@ -1,10 +1,10 @@
 package com.MineShoku.Backpack.Mock;
 
+import com.MineShoku.Backpack.NotFullyImplemented;
 import fr.phoenixdevt.profiles.PlayerProfile;
 import fr.phoenixdevt.profiles.data.LocationMap;
 import fr.phoenixdevt.profiles.data.ProfileAttributable;
 import fr.phoenixdevt.profiles.placeholder.PlaceholderCache;
-import com.MineShoku.Backpack.NotFullyImplemented;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.inventory.ItemStack;

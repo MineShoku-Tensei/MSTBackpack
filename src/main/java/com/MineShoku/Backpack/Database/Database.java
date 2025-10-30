@@ -1,7 +1,8 @@
-package com.MineShoku.Backpack;
+package com.MineShoku.Backpack.Database;
 
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
+import com.MineShoku.Backpack.Info;
+import com.MineShoku.Backpack.Main;
+import com.MineShoku.Backpack.Pair;
 import org.bukkit.inventory.ItemStack;
 import org.checkerframework.checker.index.qual.NonNegative;
 import org.jetbrains.annotations.NotNull;
@@ -10,7 +11,7 @@ import org.jetbrains.annotations.Nullable;
 import java.sql.*;
 import java.util.*;
 
-public abstract class Database {
+public abstract class Database extends com.MineShoku.Utils.Database.Database {
 	private static final @NotNull String POOL_NAME = "MSTBackpack";
 	protected static final @NotNull String TABLE_PLAYERS = "MSTBackpackPlayers";
 	protected static final @NotNull String TABLE_PROFILES = "MSTBackpackProfiles";
@@ -19,88 +20,46 @@ public abstract class Database {
 	protected static final @NotNull String COLUMN_ITEMS = "Items";
 	protected static final @NotNull String COLUMN_EXTRAS = "Extras";
 	private static final byte @NotNull [] NULL_ITEMS_BYTES = ItemStack.serializeItemsAsBytes(Collections.emptyList());
-	private static final @NotNull String STATEMENT_GET_EXTRAS_PLAYER = "SELECT " + COLUMN_EXTRAS + " FROM " + TABLE_PLAYERS + " WHERE " + COLUMN_PLAYER_ID + "=?;";
-	private static final @NotNull String STATEMENT_GET_EXTRAS_PROFILE = "SELECT " + COLUMN_EXTRAS + " FROM " + TABLE_PROFILES + " WHERE " + COLUMN_PLAYER_ID + "=? AND " + COLUMN_PROFILE_ID + "=?;";
-	private static final @NotNull String STATEMENT_GET_INFO = "SELECT " + COLUMN_ITEMS + ", " + COLUMN_EXTRAS + " FROM " + TABLE_PROFILES + " WHERE " + COLUMN_PLAYER_ID + "=? AND " + COLUMN_PROFILE_ID + "=?;";
+	private static final @NotNull String STATEMENT_GET_EXTRAS_PLAYER = new SelectBuilder(TABLE_PLAYERS).columns(COLUMN_EXTRAS).where(COLUMN_PLAYER_ID).build();
+	private static final @NotNull String STATEMENT_GET_EXTRAS_PROFILE = new SelectBuilder(TABLE_PROFILES).columns(COLUMN_EXTRAS).
+			where(COLUMN_PLAYER_ID, COLUMN_PROFILE_ID).build();
+	private static final @NotNull String STATEMENT_GET_INFO = new SelectBuilder(TABLE_PROFILES).columns(COLUMN_ITEMS, COLUMN_EXTRAS).
+			where(COLUMN_PLAYER_ID, COLUMN_PROFILE_ID).build();
 
-	private final @NotNull HikariConfig hikariConfig;
+	protected final @NotNull Main plugin;
 	private final @NotNull String statementSaveItems;
 	private final @NotNull String statementSaveExtrasPlayer;
 	private final @NotNull String statementSaveExtrasProfile;
-	private @Nullable HikariDataSource hikari;
 
-	protected Database(@NotNull String url, @Nullable String username, @Nullable String password) throws ClassNotFoundException {
-		String jdbc = jdbc();
-		if (jdbc != null) {
-			Class.forName(jdbc);
-		}
-		this.hikariConfig = createHikariConfig(url, username, password);
-		this.statementSaveItems = "INSERT INTO " + TABLE_PROFILES +
-				" (" + COLUMN_PLAYER_ID + ", " + COLUMN_PROFILE_ID + ", " + COLUMN_ITEMS + ") VALUES (?, ?, ?) " +
-				onConflictUpdate(COLUMN_ITEMS + "=" + fromConflict(COLUMN_ITEMS), COLUMN_PLAYER_ID, COLUMN_PROFILE_ID) + ";";
-		this.statementSaveExtrasPlayer = "INSERT INTO " + TABLE_PLAYERS +
-				" (" + COLUMN_PLAYER_ID + ", " + COLUMN_EXTRAS + ") VALUES (?, ?) " +
-				onConflictUpdate(COLUMN_EXTRAS + "=" + functionMin() + "(" + functionMax() + "(" + TABLE_PLAYERS + "." + COLUMN_EXTRAS + " + " + fromConflict(COLUMN_EXTRAS) + ", ?), ?)", COLUMN_PLAYER_ID) + ";";
-		this.statementSaveExtrasProfile = "INSERT INTO " + TABLE_PROFILES +
-				" (" + COLUMN_PLAYER_ID + ", " + COLUMN_PROFILE_ID + ", " + COLUMN_ITEMS + ", " + COLUMN_EXTRAS + ") VALUES (?, ?, ?, ?) " +
-				onConflictUpdate(COLUMN_EXTRAS + "=" + functionMin() + "(" + functionMax() + "(" + TABLE_PROFILES + "." + COLUMN_EXTRAS + " + " + fromConflict(COLUMN_EXTRAS) + ", ?), ?)", COLUMN_PLAYER_ID, COLUMN_PROFILE_ID) + ";";
-	}
-
-	@Nullable protected abstract String jdbc();
-
-	@NotNull
-	protected HikariConfig createHikariConfig(@NotNull String url, @Nullable String username, @Nullable String password) {
-		HikariConfig hikariConfig = new HikariConfig();
-		hikariConfig.setPoolName(POOL_NAME);
-		if (username != null) {
-			hikariConfig.setUsername(username);
-		}
-		if (password != null) {
-			hikariConfig.setPassword(password);
-		}
-		hikariConfig.setJdbcUrl(url);
-		hikariConfig.addDataSourceProperty("cachePrepStmts", "true");
-		hikariConfig.addDataSourceProperty("prepStmtCacheSize", "250");
-		hikariConfig.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
-		hikariConfig.addDataSourceProperty("useServerPrepStmts", "true");
-		hikariConfig.addDataSourceProperty("useLocalSessionState", "true");
-		hikariConfig.addDataSourceProperty("rewriteBatchedStatements", "true");
-		hikariConfig.addDataSourceProperty("cacheResultSetMetadata", "true");
-		hikariConfig.addDataSourceProperty("cacheServerConfiguration", "true");
-		hikariConfig.addDataSourceProperty("elideSetAutoCommits", "true");
-		hikariConfig.addDataSourceProperty("maintainTimeStats", "false");
-		hikariConfig.setMaximumPoolSize(20);
-		return hikariConfig;
+	protected Database(@NotNull Main plugin, @NotNull String url, @Nullable String username, @Nullable String password) throws ClassNotFoundException {
+		super(url, POOL_NAME, username, password);
+		this.plugin = plugin;
+		this.statementSaveItems = new InsertBuilder(TABLE_PROFILES).columns(COLUMN_PLAYER_ID, COLUMN_PROFILE_ID, COLUMN_ITEMS).
+				conflictUpdate(COLUMN_ITEMS + "=" + fromConflict(COLUMN_ITEMS), COLUMN_PLAYER_ID, COLUMN_PROFILE_ID).build();
+		String prefix = COLUMN_EXTRAS + "=" + functionMin() + "(" + functionMax() + "(",
+				suffix = "." + COLUMN_EXTRAS + " + " + fromConflict(COLUMN_EXTRAS) + ", ?), ?)";
+		this.statementSaveExtrasPlayer = new InsertBuilder(TABLE_PLAYERS).columns(COLUMN_PLAYER_ID, COLUMN_EXTRAS).
+				conflictUpdate(prefix + TABLE_PLAYERS + suffix, COLUMN_PLAYER_ID).build();
+		this.statementSaveExtrasProfile = new InsertBuilder(TABLE_PROFILES).columns(COLUMN_PLAYER_ID, COLUMN_PROFILE_ID, COLUMN_ITEMS, COLUMN_EXTRAS).
+				conflictUpdate(prefix + TABLE_PROFILES + suffix, COLUMN_PLAYER_ID, COLUMN_PROFILE_ID).build();
 	}
 
 	protected final void prepareDatabase() throws SQLException {
 		try (Connection connection = getConnection(); Statement statement = connection.createStatement()) {
-			statement.execute("CREATE TABLE IF NOT EXISTS " + TABLE_PLAYERS + " (" +
-					COLUMN_PLAYER_ID + " VARCHAR(36) NOT NULL PRIMARY KEY, " +
-					COLUMN_EXTRAS + " INT UNSIGNED NOT NULL DEFAULT 0" +
-					");");
-			statement.execute("CREATE TABLE IF NOT EXISTS " + TABLE_PROFILES + " (" +
-					COLUMN_PLAYER_ID + " VARCHAR(36) NOT NULL, " +
-					COLUMN_PROFILE_ID + " VARCHAR(36) NOT NULL, " +
-					COLUMN_ITEMS + " LONGBLOB NOT NULL, " +
-					COLUMN_EXTRAS + " INT UNSIGNED NOT NULL DEFAULT 0, " +
-					"PRIMARY KEY (" + COLUMN_PLAYER_ID + ", " + COLUMN_PROFILE_ID + ")" +
-					");");
+			statement.execute(new TableBuilder(TABLE_PLAYERS).
+					column(COLUMN_PLAYER_ID, "VARCHAR(36)", false, "PRIMARY KEY").
+					column(COLUMN_EXTRAS, "INT UNSIGNED", false, "DEFAULT 0").
+					build()
+			);
+			statement.execute(new TableBuilder(TABLE_PROFILES).
+					column(COLUMN_PLAYER_ID, "VARCHAR(36)", false).
+					column(COLUMN_PROFILE_ID, "VARCHAR(36)", false).
+					column(COLUMN_ITEMS, "LONGBLOB", false).
+					column(COLUMN_EXTRAS, "INT UNSIGNED", false, "DEFAULT 0").
+					primaryKeys(COLUMN_PLAYER_ID, COLUMN_PROFILE_ID).
+					build()
+			);
 		}
-	}
-
-	public final void close() {
-		if (this.hikari == null) return;
-		this.hikari.close();
-		this.hikari = null;
-	}
-
-	@NotNull
-	public final Connection getConnection() throws SQLException {
-		if (this.hikari == null || this.hikari.isClosed()) {
-			this.hikari = new HikariDataSource(this.hikariConfig);
-		}
-		return this.hikari.getConnection();
 	}
 
 	@NonNegative
@@ -150,19 +109,6 @@ public abstract class Database {
 			return new Info(playerID, profileID, items, extrasPlayer, extrasProfile);
 		}
 	}
-
-	@NotNull protected abstract String onConflictPrefix(@NotNull String @NotNull ... keys);
-
-	@NotNull
-	protected final String onConflictUpdate(@NotNull String updateLogic, @NotNull String @NotNull ... keys) {
-		return onConflictPrefix(keys) + " " + updateLogic;
-	}
-
-	@NotNull protected abstract String fromConflict(@NotNull String column);
-
-	@NotNull protected abstract String functionMin();
-
-	@NotNull protected abstract String functionMax();
 
 	public final void saveItems(@NotNull Info info) throws SQLException {
 		try (Connection connection = getConnection()) {

@@ -1,17 +1,15 @@
 package com.MineShoku.Backpack;
 
-import fr.phoenixdevt.profiles.PlayerProfile;
-import fr.phoenixdevt.profiles.ProfileList;
-import fr.phoenixdevt.profiles.ProfileProvider;
+import com.MineShoku.Utils.ProfileUtils;
+import com.MineShoku.Utils.TextUtils;
+import com.MineShoku.Utils.Utils;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.*;
 import org.bukkit.entity.Player;
 import org.checkerframework.checker.index.qual.Positive;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 import java.util.*;
@@ -27,7 +25,7 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 	private static final @Positive int INDEX_CLEAR = BASE.indexOf("clear");
 	private static final @Positive int INDEX_UPGRADE = BASE.indexOf("upgrade");
 	private static final @Positive int INDEX_DOWNGRADE = BASE.indexOf("downgrade");
-	private static final @NotNull Component HELP = MiniMessage.miniMessage().deserialize("""
+	private static final @NotNull Component HELP = Utils.toRichComponent("""
 			<gold>reload - reload config file
 			open <player> <profile> - open player's inventory (use '.' for current player/profile)
 			upgrade <player> <profile> <n> - +n extras (use '.' for current player/profile; use '-' for profile to use on player)
@@ -36,7 +34,6 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 
 	private final @NotNull PluginCommand command;
 	private final @NotNull Main plugin;
-	private final @NotNull ProfileProvider<?> providerMMOProfiles;
 	private final @NotNull Map<@NotNull UUID, @NotNull ClearInfo> timesPlayers = new HashMap<>();
 	private final @NotNull Map<@NotNull String, @NotNull ClearInfo> timesOthers = new HashMap<>();
 
@@ -45,7 +42,6 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 		this.command.setExecutor(this);
 		this.command.setTabCompleter(this);
 		this.plugin = plugin;
-		this.providerMMOProfiles = Objects.requireNonNull(Bukkit.getServicesManager().getRegistration(ProfileProvider.class)).getProvider();
 	}
 
 	public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String @NotNull [] args) {
@@ -53,7 +49,7 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 		UUID playerID, profileID;
 		Player player;
 		if (args.length > 0 && advanced) {
-			int idx = BASE.indexOf(Utils.toLowerCase(args[0]));
+			int idx = BASE.indexOf(TextUtils.toLowerCase(args[0]));
 			if (idx == 1) {
 				try {
 					this.plugin.reload();
@@ -79,21 +75,16 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 			if ((idx == INDEX_UPGRADE || idx == INDEX_DOWNGRADE) && args[2].equals(EXTRAS_SET_PLAYER)) {
 				profileID = null;
 			} else {
-				ProfileList<?> playerData = playerData(playerID);
-				PlayerProfile<?> profile = null;
-				if (playerData != null) {
-					if (!args[2].equals(EXTRAS_CURRENT)) {
-						UUID id = Utils.getUUID(args[2]);
-						profile = id == null ? null : playerData.getProfile(id);
-					} else if (offlinePlayer.isOnline()) {
-						profile = playerData.getCurrent();
-					}
+				if (args[2].equals(EXTRAS_CURRENT)) {
+					profileID = ProfileUtils.getCurrentProfileID(playerID);
+				} else {
+					UUID id = Utils.getUUID(args[2]);
+					profileID = id == null || !ProfileUtils.hasPlayerProfile(playerID, id) ? null : id;
 				}
-				if (profile == null) {
+				if (profileID == null) {
 					noProfile(sender);
 					return true;
 				}
-				profileID = profile.getUniqueId();
 			}
 			if (idx != INDEX_OPEN) {
 				if (idx == INDEX_CLEAR) {
@@ -122,7 +113,11 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 									Utils.logException(e);
 									return false;
 								}
-							}) , this.plugin, success -> Utils.sendMessage(sender, success ? this.plugin.config().messageClearFinish(offlinePlayer, profileID) : this.plugin.config().messageCommandFailed()));
+							}) , this.plugin, success -> {
+								Component msg = success ? this.plugin.config().messageClearFinish(offlinePlayer, profileID) :
+										this.plugin.config().messageCommandFailed();
+								Utils.sendMessage(sender, msg);
+							});
 						}
 					}
 				} else {
@@ -178,13 +173,11 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 		else {
 			player = onlinePlayer;
 			playerID = player.getUniqueId();
-			ProfileList<?> playerData = playerData(playerID);
-			PlayerProfile<?> currentProfile;
-			if (playerData == null || (currentProfile = playerData.getCurrent()) == null) {
+			profileID = ProfileUtils.getCurrentProfileID(playerID);
+			if (profileID == null) {
 				Utils.sendMessage(player, this.plugin.config().messageProfileNotSelected());
 				return true;
 			}
-			profileID = currentProfile.getUniqueId();
 		}
 		if (profileID == null) {
 			noProfile(sender);
@@ -220,7 +213,7 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 		if (args.length == 1) {
 			return BASE.stream().filter(cmd -> Utils.checkTabComplete(args[0], cmd)).toList();
 		}
-		int idx = BASE.indexOf(Utils.toLowerCase(args[0]));
+		int idx = BASE.indexOf(TextUtils.toLowerCase(args[0]));
 		if (idx < 2) return new ArrayList<>();
 		if (args.length == 2) {
 			Stream<String> stream = Bukkit.getOnlinePlayers().stream().map(Player::getName);
@@ -230,32 +223,23 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 			return stream.filter(cmd -> Utils.checkTabComplete(args[1], cmd)).toList();
 		}
 		if (args.length == 3) {
-			OfflinePlayer offlinePlayer = args[1].equals(EXTRAS_CURRENT) ? ((sender instanceof Player player) ? player : null) : Utils.offlinePlayerCached(args[1]);
+			OfflinePlayer offlinePlayer = args[1].equals(EXTRAS_CURRENT) ? ((sender instanceof Player p) ? p : null) : Utils.offlinePlayerCached(args[1]);
 			if (offlinePlayer == null) return new ArrayList<>();
 			UUID playerID = offlinePlayer.getUniqueId();
-			ProfileList<?> playerData = playerData(playerID);
-			Stream<String> special = Stream.empty(), players = playerData == null ? Stream.empty() : playerData.getProfiles().stream().map(PlayerProfile::getUniqueId).map(UUID::toString);
+			List<UUID> profileIDs = ProfileUtils.getProfileIDs(playerID);
+			Stream<String> special = Stream.empty(), profiles = profileIDs == null ? Stream.empty() : profileIDs.stream().map(UUID::toString);
 			if (idx == INDEX_UPGRADE || idx == INDEX_DOWNGRADE) {
 				special = offlinePlayer.isOnline() ? Stream.of(EXTRAS_CURRENT, EXTRAS_SET_PLAYER) : Stream.of(EXTRAS_SET_PLAYER);
 			} else if ((idx == INDEX_OPEN || idx == INDEX_CLEAR) && offlinePlayer.isOnline()) {
 				special = Stream.of(EXTRAS_CURRENT);
 			}
-			return Stream.concat(special, players).filter(cmd -> Utils.checkTabComplete(args[2], cmd)).toList();
+			return Stream.concat(special, profiles).filter(cmd -> Utils.checkTabComplete(args[2], cmd)).toList();
 		}
 		return new ArrayList<>();
 	}
 
 	private void noProfile(@NotNull CommandSender sender) {
 		Utils.sendMessage(sender, this.plugin.config().messageNotFoundProfile());
-	}
-
-	@Nullable
-	private ProfileList<?> playerData(@NotNull UUID playerID) {
-		try {
-			return this.providerMMOProfiles.getPlayerData(playerID);
-		} catch (Exception e) {
-			return null;
-		}
 	}
 
 	public void reload() {
