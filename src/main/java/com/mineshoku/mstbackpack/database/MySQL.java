@@ -1,7 +1,7 @@
-package com.MineShoku.Backpack.Database;
+package com.mineshoku.mstbackpack.database;
 
-import com.MineShoku.Backpack.Main;
-import com.MineShoku.Utils.Database.MySQLDatabase;
+import com.mineshoku.mstbackpack.Main;
+import com.mineshoku.mstutils.database.MySQLDatabase;
 import org.jetbrains.annotations.NotNull;
 
 import java.sql.SQLException;

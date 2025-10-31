@@ -1,6 +1,5 @@
-package com.MineShoku.Backpack.Mock;
+package com.mineshoku.mstbackpack.mock;
 
-import com.MineShoku.Backpack.NotFullyImplemented;
 import fr.phoenixdevt.profiles.ProfileList;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -10,7 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
 
-public class MMOProfile implements ProfileList<MMOPlayerProfile>, NotFullyImplemented {
+public class MMOProfile implements ProfileList<MMOPlayerProfile> {
 	private final @NotNull Player player;
 	private final @NotNull LinkedHashMap<@NotNull UUID, @NotNull MMOPlayerProfile> profiles = new LinkedHashMap<>();
 	private @Nullable MMOPlayerProfile currentProfile;

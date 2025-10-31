@@ -1,8 +1,8 @@
-package com.MineShoku.Backpack.Database;
+package com.mineshoku.mstbackpack.database;
 
-import com.MineShoku.Backpack.Info;
-import com.MineShoku.Backpack.Main;
-import com.MineShoku.Backpack.Pair;
+import com.mineshoku.mstbackpack.Info;
+import com.mineshoku.mstbackpack.Main;
+import com.mineshoku.mstutils.Pair;
 import org.bukkit.inventory.ItemStack;
 import org.checkerframework.checker.index.qual.NonNegative;
 import org.jetbrains.annotations.NotNull;
@@ -11,7 +11,7 @@ import org.jetbrains.annotations.Nullable;
 import java.sql.*;
 import java.util.*;
 
-public abstract class Database extends com.MineShoku.Utils.Database.Database {
+public abstract class Database extends com.mineshoku.mstutils.database.Database {
 	private static final @NotNull String POOL_NAME = "MSTBackpack";
 	protected static final @NotNull String TABLE_PLAYERS = "MSTBackpackPlayers";
 	protected static final @NotNull String TABLE_PROFILES = "MSTBackpackProfiles";
@@ -155,7 +155,7 @@ public abstract class Database extends com.MineShoku.Utils.Database.Database {
 		try (Connection connection = getConnection()) {
 			int extrasPlayer = getExtrasPlayer(connection, playerID),
 					extrasProfile = profileID == null ? 0 : getExtrasProfile(connection, playerID, profileID);
-			return new Pair<>(extrasPlayer, extrasProfile);
+			return Pair.of(extrasPlayer, extrasProfile);
 		}
 	}
 }

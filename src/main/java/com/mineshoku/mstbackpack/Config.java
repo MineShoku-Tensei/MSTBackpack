@@ -1,8 +1,8 @@
-package com.MineShoku.Backpack;
+package com.mineshoku.mstbackpack;
 
-import com.MineShoku.Utils.MathUtils;
-import com.MineShoku.Utils.TextUtils;
-import com.MineShoku.Utils.Utils;
+import com.mineshoku.mstutils.MathUtils;
+import com.mineshoku.mstutils.TextUtils;
+import com.mineshoku.mstutils.Utils;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.Tag;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;

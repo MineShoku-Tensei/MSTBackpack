@@ -1,7 +1,7 @@
-package com.MineShoku.Backpack.Database;
+package com.mineshoku.mstbackpack.database;
 
-import com.MineShoku.Backpack.Main;
-import com.MineShoku.Utils.Database.LocalDatabase;
+import com.mineshoku.mstbackpack.Main;
+import com.mineshoku.mstutils.database.LocalDatabase;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;

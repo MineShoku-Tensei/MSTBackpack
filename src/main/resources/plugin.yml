@@ -1,7 +1,7 @@
-name: ${project.artifactId}
+name: ${project.name}
 version: ${project.version}
 description: ${project.description}
-main: com.MineShoku.Backpack.Main
+main: ${project.groupId}.${project.artifactId}.Main
 author: DMan16
 api-version: 1.21
 depend:

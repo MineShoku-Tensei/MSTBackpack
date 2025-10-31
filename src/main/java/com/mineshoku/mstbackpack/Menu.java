@@ -1,8 +1,8 @@
-package com.MineShoku.Backpack;
+package com.mineshoku.mstbackpack;
 
-import com.MineShoku.Utils.InventoryUtils;
-import com.MineShoku.Utils.TextUtils;
-import com.MineShoku.Utils.Utils;
+import com.mineshoku.mstutils.InventoryUtils;
+import com.mineshoku.mstutils.TextUtils;
+import com.mineshoku.mstutils.Utils;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;

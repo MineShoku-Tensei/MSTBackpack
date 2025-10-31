@@ -1,8 +1,8 @@
-package com.MineShoku.Backpack;
+package com.mineshoku.mstbackpack;
 
-import com.MineShoku.Backpack.Mock.MMOPlayerProfile;
-import com.MineShoku.Backpack.Mock.MMOProfile;
-import com.MineShoku.Backpack.Mock.MMOProfileProvider;
+import com.mineshoku.mstbackpack.mock.MMOPlayerProfile;
+import com.mineshoku.mstbackpack.mock.MMOProfile;
+import com.mineshoku.mstbackpack.mock.MMOProfileProvider;
 import fr.phoenixdevt.profiles.ProfileProvider;
 import org.bukkit.Bukkit;
 import org.bukkit.event.inventory.InventoryType;

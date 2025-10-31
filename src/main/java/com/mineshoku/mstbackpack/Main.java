@@ -1,9 +1,9 @@
-package com.MineShoku.Backpack;
+package com.mineshoku.mstbackpack;
 
-import com.MineShoku.Backpack.Database.Database;
-import com.MineShoku.Backpack.Database.Local;
-import com.MineShoku.Backpack.Database.MySQL;
-import com.MineShoku.Utils.Utils;
+import com.mineshoku.mstbackpack.database.Database;
+import com.mineshoku.mstbackpack.database.Local;
+import com.mineshoku.mstbackpack.database.MySQL;
+import com.mineshoku.mstutils.Utils;
 import com.zaxxer.hikari.pool.HikariPool;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;

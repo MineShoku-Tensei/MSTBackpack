@@ -1,8 +1,9 @@
-package com.MineShoku.Backpack;
+package com.mineshoku.mstbackpack;
 
-import com.MineShoku.Utils.ProfileUtils;
-import com.MineShoku.Utils.TextUtils;
-import com.MineShoku.Utils.Utils;
+import com.mineshoku.mstutils.Pair;
+import com.mineshoku.mstutils.ProfileUtils;
+import com.mineshoku.mstutils.TextUtils;
+import com.mineshoku.mstutils.Utils;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
