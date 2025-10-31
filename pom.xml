@@ -111,6 +111,10 @@
             <id>mojang</id>
             <url>https://libraries.minecraft.net/</url>
         </repository>
+        <repository><!--MSTUtils-->
+            <id>mstutils</id>
+            <url>https://maven.pkg.github.com/MineShoku-Tensei/MSTUtils/</url>
+        </repository>
         <repository><!--MMOProfile-->
             <id>phoenix</id>
             <url>https://nexus.phoenixdevt.fr/repository/maven-public/</url>
@@ -124,18 +128,6 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>com.mineshoku</groupId>
-            <artifactId>mstuils</artifactId>
-            <version>1.0</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.zaxxer</groupId>
-            <artifactId>HikariCP</artifactId>
-            <version>5.0.1</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
             <version>${minecraft.version}</version>
@@ -145,6 +137,12 @@
             <groupId>com.mojang</groupId>
             <artifactId>authlib</artifactId>
             <version>6.0.54</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.mineshoku</groupId>
+            <artifactId>mstuils</artifactId>
+            <version>1.0</version>
             <scope>provided</scope>
         </dependency>
         <dependency>

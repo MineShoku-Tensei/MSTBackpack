@@ -17,6 +17,9 @@ permissions:
 jobs:
     build:
         if: github.event.pull_request.draft != true
+        permissions:
+            contents: read
+            packages: read
         runs-on: ubuntu-latest
 
         steps:
@@ -31,6 +34,9 @@ jobs:
                   java-version: '21'
                   distribution: 'temurin'
                   cache: maven
+
+            - name: Maven settings for GitHub
+              uses: s4u/maven-settings-action@v4.0.0
 
             - name: Build with Maven
               run: mvn -B clean package
