@@ -1,4 +1,4 @@
-package me.MineShoku.Backpack;
+package com.mineshoku.mstbackpack;
 
 import org.bukkit.inventory.ItemStack;
 import org.checkerframework.checker.index.qual.NonNegative;

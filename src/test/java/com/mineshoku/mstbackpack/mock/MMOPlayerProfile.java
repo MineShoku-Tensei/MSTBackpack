@@ -1,10 +1,10 @@
-package me.MineShoku.Backpack.Mock;
+package com.mineshoku.mstbackpack.mock;
 
+import com.mineshoku.mstutils.Utils;
 import fr.phoenixdevt.profiles.PlayerProfile;
 import fr.phoenixdevt.profiles.data.LocationMap;
 import fr.phoenixdevt.profiles.data.ProfileAttributable;
 import fr.phoenixdevt.profiles.placeholder.PlaceholderCache;
-import me.MineShoku.Backpack.NotFullyImplemented;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.inventory.ItemStack;
@@ -15,7 +15,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.UUID;
 
-public class MMOPlayerProfile implements PlayerProfile<MMOProfile>, NotFullyImplemented {
+public class MMOPlayerProfile implements PlayerProfile<MMOProfile> {
 	private final @NotNull UUID ID;
 
 	public MMOPlayerProfile(@NotNull UUID ID) {
@@ -28,116 +28,116 @@ public class MMOPlayerProfile implements PlayerProfile<MMOProfile>, NotFullyImpl
 	}
 
 	public double getHealth() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	public int getFoodLevel() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	public float getSaturation() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	public float getExperience() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	public int getLevel() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	public int getAirLevel() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	@NotNull
 	public LocationMap getLocationMap() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	@Nullable
 	public Location getLocation() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	@NotNull
 	public LocationMap getTeleportLocationMap() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	@NotNull
 	public Location findLastLocation() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	@NotNull
 	public LocationMap getRespawnLocationMap() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	@Nullable
 	public Location getRespawnLocation() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	@NotNull
 	public LocationMap getCompassTargetMap() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	@Nullable
 	public Location getCompassTarget() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	@NotNull
 	public ItemStack[] getInventory() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	@NotNull
 	public ItemStack[] getEnderChest() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	@NotNull
 	public List<PotionEffect> getPotionEffects() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	public double getBalance() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	public long getLastTimePlayed() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	public long getTimePlayed() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	@NotNull
 	public GameMode getGameMode() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	@NotNull
 	public ProfileAttributable getAttributes() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	@NotNull
 	public PlaceholderCache getPlaceholderCache() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	public void applyToPlayer(MMOProfile mmoProfile) {
-		notImplemented();
+		Utils.throwUnimplemented();
 	}
 
 	public void validateApplication(MMOProfile mmoProfile) {
-		notImplemented();
+		Utils.throwUnimplemented();
 	}
 }

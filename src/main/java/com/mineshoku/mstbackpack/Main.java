@@ -1,5 +1,9 @@
-package me.MineShoku.Backpack;
+package com.mineshoku.mstbackpack;
 
+import com.mineshoku.mstbackpack.database.Database;
+import com.mineshoku.mstbackpack.database.Local;
+import com.mineshoku.mstbackpack.database.MySQL;
+import com.mineshoku.mstutils.Utils;
 import com.zaxxer.hikari.pool.HikariPool;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -15,10 +19,10 @@ public class Main extends JavaPlugin {
 		try {
 			String host = this.config.host();
 			if (host == null || host.isBlank()) {
-				this.database = new LocalDatabase(this);
+				this.database = new Local(this);
 			} else {
 				try {
-					this.database = new MySQLDatabase(this, host);
+					this.database = new MySQL(this, host);
 				} catch (HikariPool.PoolInitializationException e) {
 					failed = true;
 					getLogger().severe("Failed connecting to MySQL DB!");
