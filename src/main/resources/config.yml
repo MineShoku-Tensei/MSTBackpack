@@ -44,26 +44,26 @@ backpack:
         # 'type' and 'slot' are required
         # Setting 'slot' to negative will go backwards from the end
         # Available placeholders:
-        #   %page%                - current page number
-        #   %page+n%              - current page number plus n, maxed out at max pages
-        #   %page-n%              - current page number minus n, minimum 1
-        #   %pages%               - total pages available
-        #   %extras_player%       - extras of the player
-        #   %extras_player_max%   - max possible player extras
-        #   %extras_profile%      - extras of the profile
-        #   %extras_profile_max%  - max possible profile extras
-        #   %extras_total%        - total extras (%extras_player% + %extras_profile%)
-        #   %extras_total_max%    - max possible total extras (%extras_player_max% + %extras_profile_max%)
+        #   <page>                - current page number
+        #   <page+n>              - current page number plus n, maxed out at max pages
+        #   <page-n>              - current page number minus n, minimum 1
+        #   <pages>               - total pages available
+        #   <extras_player>       - extras of the player
+        #   <extras_player_max>   - max possible player extras
+        #   <extras_profile>      - extras of the profile
+        #   <extras_profile_max>  - max possible profile extras
+        #   <extras_total>        - total extras (<extras_player> + <extras_profile>)
+        #   <extras_total_max>    - max possible total extras (<extras_player_max> + <extras_profile_max>)
         item:
             indicator:
                 type: "paper"
-                name: "<light_purple><lang:book.pageIndicator:'%page%':'%pages%'>"
+                name: "<light_purple><lang:book.pageIndicator:'<page>':'<pages>'>"
                 lore:
                     - ""
-                    - "<!italic><white>Player extras unlocked: <gold>%extras_player%</gold>/<aqua>%extras_player_max%</aqua>"
-                    - "<!italic><white>Profile extras unlocked: <gold>%extras_profile%</gold>/<aqua>%extras_profile_max%</aqua>"
+                    - "<!italic><white>Player extras unlocked: <gold><extras_player></gold>/<aqua><extras_player_max></aqua>"
+                    - "<!italic><white>Profile extras unlocked: <gold><extras_profile></gold>/<aqua><extras_profile_max></aqua>"
                     - ""
-                    - "<!italic><white>Total extras unlocked: <gold>%extras_total%</gold>/<aqua>%extras_total_max%</aqua>"
+                    - "<!italic><white>Total extras unlocked: <gold><extras_total></gold>/<aqua><extras_total_max></aqua>"
                 model:
                 slot: 4
             close:
@@ -72,11 +72,11 @@ backpack:
                 slot: -5
             next:
                 type: "arrow"
-                name: "<green><lang:spectatorMenu.next_page> (%page+1%)"
+                name: "<green><lang:spectatorMenu.next_page> (<page+1>)"
                 slot: -1
             previous:
                 type: "arrow"
-                name: "<gold><lang:spectatorMenu.previous_page> (%page-1%)"
+                name: "<gold><lang:spectatorMenu.previous_page> (<page-1>)"
                 slot: -9
             # 'slot' is not required
             border:
@@ -94,32 +94,32 @@ backpack:
             profile: "<red>Profile not found"
         # For '/backpack clear ...'
         # Available placeholders:
-        #   %player_id%           - player's UUID
-        #   %player_name%         - player's name
-        #   %profile_id%          - profile's UUID
+        #   <player_id>           - player's UUID
+        #   <player_name>         - player's name
+        #   <profile_id>          - profile's UUID
         clear:
             # Request resend of clear command to confirm
-            resend: "<aqua>Run <gold><bold><click:run_command:/backpack clear %player_id% %profile_id%>backpack clear command</click></bold></gold> again to confirm"
+            resend: "<aqua>Run <gold><bold><click:run_command:/backpack clear <player_id> <profile_id>>backpack clear command</click></bold></gold> again to confirm"
             # Confirmation of clear
-            finish: "<aqua>Backpack for <gold>%player_name%</gold> (<white>%player_id%</white>, profile <white>%profile_id%</white>) cleared"
+            finish: "<aqua>Backpack for <gold><player_name></gold> (<white><player_id></white>, profile <white><profile_id></white>) cleared"
         # Extras updated
         # Available placeholders:
-        #   %player_id%           - player's UUID
-        #   %player_name%         - player's name
+        #   <player_id>           - player's UUID
+        #   <player_name>         - player's name
         extras_set:
             # Extras of player updated
             # Additional placeholders:
-            #   %extras%          - new value of player extras
-            #   %extras_max%      - max possible player extras
-            player: "<aqua>Extras for <gold>%player_name%</gold> (<white>%player_id%</white>): <gold>%extras%</gold> out of <gold>%extras_max%</gold>"
+            #   <extras>          - new value of player extras
+            #   <extras_max>      - max possible player extras
+            player: "<aqua>Extras for <gold><player_name></gold> (<white><player_id></white>): <gold><extras></gold> out of <gold><extras_max></gold>"
             # Extras of profile updated
             # Additional placeholders:
-            #   %profile_id%      - profile's UUID
-            #   %extras%          - new value of profile extras
-            #   %extras_max%      - max possible profile extras
-            #   %total%           - new value of total extras (profile + player)
-            #   %total_max%       - max possible total extras (profile + player)
-            profile: "<aqua>Extras for <gold>%player_name%</gold> (<white>%player_id%</white>, profile <white>%profile_id%</white>): <gold>%extras%</gold> out of <gold>%extras_max%</gold>, total extras: <gold>%total%</gold> out of <gold>%total_max%</gold>"
+            #   <profile_id>      - profile's UUID
+            #   <extras>          - new value of profile extras
+            #   <extras_max>      - max possible profile extras
+            #   <total>           - new value of total extras (profile + player)
+            #   <total_max>       - max possible total extras (profile + player)
+            profile: "<aqua>Extras for <gold><player_name></gold> (<white><player_id></white>, profile <white><profile_id></white>): <gold><extras></gold> out of <gold><extras_max></gold>, total extras: <gold><total></gold> out of <gold><total_max></gold>"
         # Player has no profile selected
         profile_not_selected: "<red>Profile not selected"
         # Failed opening the backpack (DB issues, etc.)

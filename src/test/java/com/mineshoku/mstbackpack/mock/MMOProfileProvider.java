@@ -1,27 +1,27 @@
-package me.MineShoku.Backpack.Mock;
+package com.mineshoku.mstbackpack.mock;
 
+import com.mineshoku.mstutils.Utils;
 import fr.phoenixdevt.profiles.ProfileDataModule;
 import fr.phoenixdevt.profiles.ProfileProvider;
 import fr.phoenixdevt.profiles.placeholder.PlaceholderProcessor;
-import me.MineShoku.Backpack.NotFullyImplemented;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
-public class MMOProfileProvider implements ProfileProvider<MMOProfile>, NotFullyImplemented {
+public class MMOProfileProvider implements ProfileProvider<MMOProfile> {
 	private @NotNull final HashMap<@NotNull UUID, @NotNull MMOProfile> profiles = new HashMap<>();
 
 	public void registerModule(@NotNull ProfileDataModule profileDataModule) {
-		notImplemented();
+		Utils.throwUnimplemented();
 	}
 
 	public void registerPlaceholders(@NotNull PlaceholderProcessor placeholderProcessor) {
-		notImplemented();
+		Utils.throwUnimplemented();
 	}
 
 	@NotNull
 	public Collection<ProfileDataModule> getModules() {
-		return notImplemented();
+		return Utils.throwUnimplemented();
 	}
 
 	@NotNull

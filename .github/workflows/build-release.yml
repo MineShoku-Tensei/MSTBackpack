@@ -14,17 +14,12 @@ on:
                 default: false
                 type: boolean
 
-env:
-    PROJECT_NAME: MSTBackpack
-    JAR_REGEX: MSTBackpack-*.jar
-
-permissions:
-    contents: write
-    actions: write
-
 jobs:
     build:
         if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
+        permissions:
+            contents: write
+            packages: read
         runs-on: ubuntu-latest
         outputs:
             version: ${{ steps.get_version.outputs.version }}
@@ -35,12 +30,6 @@ jobs:
               with:
                   fetch-depth: 0  # needed for git info plugins like git-commit-id-plugin
 
-            - name: Extract project version from POM
-              id: get_version
-              uses: dostonhamrakulov/maven-artifact-version-extractor@v1.0
-              with:
-                  file_path: ${{ github.workspace }}/pom.xml
-
             - name: Set up Java 21
               uses: actions/setup-java@v4
               with:
@@ -48,47 +37,51 @@ jobs:
                   distribution: 'temurin'
                   cache: maven
 
+            - name: Extract project version from POM
+              id: get_version
+              uses: dostonhamrakulov/maven-artifact-version-extractor@v1.0
+              with:
+                  file_path: ${{ github.workspace }}/pom.xml
+
             - name: Build with Maven
-              run: mvn -B clean package
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: mvn -B -s .github/maven-settings.xml clean package
 
-            - name: Find built JAR
+            - name: Find JAR
               id: jar
-              run: echo "jar_file=$(find . -maxdepth 1 -type f -name '${{ env.JAR_REGEX }}' | head -n 1)" >> "$GITHUB_OUTPUT"
-
-            - name: Rename master JAR
-              if: github.ref == 'refs/heads/master'
-              id: jar_master
               run: |
-                  renamed_jar_file="$(dirname "${{ steps.jar.outputs.jar_file }}")/${{ env.PROJECT_NAME }}-${{ steps.get_version.outputs.version }}.jar"
-                  mv -f "${{ steps.jar.outputs.jar_file }}" "$renamed_jar_file"
-                  echo "jar_file=$renamed_jar_file" >> "$GITHUB_OUTPUT"
-
-            - name: Set final JAR path
-              id: jar_final
-              run: |
-                  if [ "${{ steps.jar_master.outcome }}" = "success" ]; then
-                    echo "jar_file=${{ steps.jar_master.outputs.jar_file }}" >> "$GITHUB_OUTPUT"
-                  else
-                    echo "jar_file=${{ steps.jar.outputs.jar_file }}" >> "$GITHUB_OUTPUT"
+                  count=$(find . -maxdepth 1 -type f -name '*.jar' | wc -l)
+                  if [ "$count" -ne 1 ]; then
+                    echo "Error: expected 1 JAR file, found $count"
+                    exit 1
                   fi
+                  jar_file=$(find . -maxdepth 1 -type f -name '*.jar' | head -n 1)
+                  if [ "$GITHUB_REF" = "refs/heads/master" ]; then
+                    jar_file_master="${jar_file%-*.jar}.jar"
+                    mv -f "$jar_file" "$jar_file_master"
+                    jar_file="$jar_file_master"
+                  fi
+                  echo "jar_file=$jar_file" >> "$GITHUB_OUTPUT"
 
             - name: Upload JAR as artifact
               uses: actions/upload-artifact@v4
               with:
                   name: build-${{ github.ref_name }}
-                  path: ${{ steps.jar_final.outputs.jar_file }}
+                  path: ${{ steps.jar.outputs.jar_file }}
                   overwrite: false
                   if-no-files-found: error
-                  retention-days: 2
+                  retention-days: 1
 
     release:
         if: |
             github.ref == 'refs/heads/master' &&
             (
-                (github.event_name == 'workflow_dispatch' && inputs.release == true) ||
-                (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+                (github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
+                (github.event_name == 'workflow_dispatch' && inputs.release == true)
             )
-        permissions: write-all
+        permissions:
+            contents: write
         needs: build
         runs-on: ubuntu-latest
         steps:
@@ -117,7 +110,7 @@ jobs:
                   body: |
                       🚀 **v${{ needs.build.outputs.version }}**
 
-                  files: ${{ env.JAR_REGEX }}
+                  files: "*.jar"
                   overwrite_files: false
                   fail_on_unmatched_files: true
                   generate_release_notes: true

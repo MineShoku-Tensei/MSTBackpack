@@ -11,16 +11,12 @@ on:
             - ready_for_review
     workflow_dispatch:
 
-env:
-    PROJECT_NAME: MSTBackpack
-    JAR_REGEX: MSTBackpack-*.jar
-
-permissions:
-    contents: read
-
 jobs:
     build:
         if: github.event.pull_request.draft != true
+        permissions:
+            contents: read
+            packages: read
         runs-on: ubuntu-latest
 
         steps:
@@ -37,11 +33,14 @@ jobs:
                   cache: maven
 
             - name: Build with Maven
-              run: mvn -B clean package
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: mvn -B -s .github/maven-settings.xml clean package
 
-            - name: Find built JAR
+            - name: Find JAR
               run: |
-                  jar_file="$(find . -maxdepth 1 -type f -name '${{ env.JAR_REGEX }}' | head -n 1)"
-                  if [ -z "$jar_file" ]; then
+                  count=$(find . -maxdepth 1 -type f -name '*.jar' | wc -l)
+                  if [ "$count" -ne 1 ]; then
+                    echo "Error: expected 1 JAR file, found $count"
                     exit 1
                   fi

@@ -1,9 +1,10 @@
-package me.MineShoku.Backpack;
+package com.mineshoku.mstbackpack;
 
+import com.mineshoku.mstbackpack.mock.MMOPlayerProfile;
+import com.mineshoku.mstbackpack.mock.MMOProfile;
+import com.mineshoku.mstbackpack.mock.MMOProfileProvider;
+import com.mineshoku.mstutils.TestUtils;
 import fr.phoenixdevt.profiles.ProfileProvider;
-import me.MineShoku.Backpack.Mock.MMOPlayerProfile;
-import me.MineShoku.Backpack.Mock.MMOProfile;
-import me.MineShoku.Backpack.Mock.MMOProfileProvider;
 import org.bukkit.Bukkit;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.permissions.PermissionAttachment;
@@ -35,6 +36,7 @@ public class CommandTest {
 		this.profileProvider = new MMOProfileProvider();
 		Bukkit.getServicesManager().register(ProfileProvider.class, this.profileProvider, MockBukkit.createMockPlugin("MMOProfiles"), ServicePriority.Normal);
 		this.plugin = MockBukkit.load(Main.class);
+		MockBukkit.loadWith(com.mineshoku.mstutils.Main.class, TestUtils.PLUGIN_DESCRIPTION_UTILS);
 	}
 
 	@AfterEach

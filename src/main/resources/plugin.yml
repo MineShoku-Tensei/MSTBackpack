@@ -1,10 +1,11 @@
-name: MSTBackpack
-version: 2.0
-description: MineShoku Tensei backpack plugin
-main: me.MineShoku.Backpack.Main
+name: ${project.name}
+version: ${project.version}
+description: ${project.description}
+main: com.mineshoku.mstbackpack.Main
 author: DMan16
 api-version: 1.21
-depend: [MMOProfiles]
+depend:
+    - MSTUtils
 
 commands:
     backpack:
