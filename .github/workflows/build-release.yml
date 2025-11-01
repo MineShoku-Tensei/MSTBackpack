@@ -58,7 +58,11 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Build with Maven
-              run: mvn -B clean package
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  cat .github/maven-settings.xml
+                  mvn -B -s .github/maven-settings.xml clean package
 
             - name: Find JAR
               id: jar
