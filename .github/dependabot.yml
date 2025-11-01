@@ -1,0 +1,16 @@
+version: 2
+
+updates:
+    - package-ecosystem: "maven"
+      directory: "/"
+      schedule:
+          interval: "weekly"
+      registries:
+          - github-packages
+
+registries:
+    github-packages:
+        type: maven-repository
+        url: https://maven.pkg.github.com/MineShoku-Tensei/MSTUtils
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
