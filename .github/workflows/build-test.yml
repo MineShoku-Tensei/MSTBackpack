@@ -38,7 +38,13 @@ jobs:
             - name: Maven settings for GitHub
               uses: s4u/maven-settings-action@v4.0.0
               env:
+                  GITHUB_ACTOR: ${{ github.actor }}
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Check Maven settings
+              run: |
+                  cat ~/.m2/settings.xml
+                  cat /home/runner/.m2/settings.xml
 
             - name: Build with Maven
               run: mvn -B clean package
