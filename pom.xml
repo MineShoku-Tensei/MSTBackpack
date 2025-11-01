@@ -112,7 +112,7 @@
             <url>https://libraries.minecraft.net/</url>
         </repository>
         <repository><!--MSTUtils-->
-            <id>mstutils</id>
+            <id>github</id>
             <url>https://maven.pkg.github.com/MineShoku-Tensei/MSTUtils/</url>
         </repository>
         <repository><!--MMOProfile-->
