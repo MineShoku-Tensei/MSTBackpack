@@ -356,7 +356,7 @@ public class Menu implements Listener {
 				this.plugin.database().saveItems(saveInfo);
 				return true;
 			} catch (Exception e) {
-				Utils.logException(e);
+				Utils.logException(this.plugin, null, e);
 				return false;
 			}
 		}), this.plugin, success -> {

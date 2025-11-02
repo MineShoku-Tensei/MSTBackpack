@@ -30,8 +30,7 @@ public class Main extends JavaPlugin {
 			}
 		} catch (Exception e) {
 			failed = true;
-			getLogger().severe("Backpack command executor error: ");
-			Utils.logException(e);
+			Utils.logException(this, null, e);
 		}
 		if (failed) {
 			getLogger().severe("Disabling plugin");

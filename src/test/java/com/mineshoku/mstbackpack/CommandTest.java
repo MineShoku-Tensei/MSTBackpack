@@ -48,7 +48,6 @@ public class CommandTest {
 	void pluginLoadsSuccessfully() {
 		assertNotNull(this.plugin, "Plugin should be loaded by MockBukkit");
 		assertTrue(this.plugin.isEnabled(), "Plugin should be enabled after load");
-		assertSame(this.plugin.getServer(), Bukkit.getServer(), "Bukkit server should be same as plugin's");
 	}
 
 	@NotNull

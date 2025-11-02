@@ -56,7 +56,7 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 					this.plugin.reload();
 					Utils.sendMessage(sender, this.plugin.config().messageReloaded());
 				} catch (Exception e) {
-					Utils.logException(e);
+					Utils.logException(this.plugin, null, e);
 					Utils.sendMessage(sender, this.plugin.config().messageCommandFailed());
 				}
 				return true;
@@ -111,7 +111,7 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 									this.plugin.database().saveItems(new Info(playerID, profileID, null, 0, 0));
 									return true;
 								} catch (Exception e) {
-									Utils.logException(e);
+									Utils.logException(this.plugin, null, e);
 									return false;
 								}
 							}) , this.plugin, success -> {
@@ -144,7 +144,7 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 							}
 							return true;
 						} catch (Exception e) {
-							Utils.logException(e);
+							Utils.logException(this.plugin, null, e);
 							return false;
 						}
 					}).thenApplyAsync(success -> {
@@ -153,7 +153,7 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 							try {
 								extras = this.plugin.database().getExtras(playerID, profileID);
 							} catch (Exception e) {
-								Utils.logException(e);
+								Utils.logException(this.plugin, null, e);
 							}
 						}
 						return extras;
@@ -188,7 +188,7 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 			try {
 				return this.plugin.database().getInfo(playerID, profileID);
 			} catch (Exception e) {
-				Utils.logException(e);
+				Utils.logException(this.plugin, null, e);
 				return null;
 			}
 		}), this.plugin, info -> {
@@ -197,7 +197,7 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 				try {
 					failed = new Menu(this.plugin, player, info).openInventory() == null;
 				} catch (Exception e) {
-					Utils.logException(e);
+					Utils.logException(this.plugin, null, e);
 				}
 			}
 			if (failed) {
