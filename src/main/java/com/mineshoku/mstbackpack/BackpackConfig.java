@@ -25,7 +25,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-public final class Config {
+public final class BackpackConfig {
 	private static final @NotNull String PLACEHOLDER_PLAYER_ID = "player_id";
 	private static final @NotNull String PLACEHOLDER_PLAYER_NAME = "player_name";
 	private static final @NotNull String PLACEHOLDER_PROFILE_ID = "profile_id";
@@ -34,7 +34,7 @@ public final class Config {
 	private static final @NotNull String PLACEHOLDER_TOTAL = "total";
 	private static final @NotNull String PLACEHOLDER_TOTAL_MAX = "total_max";
 
-	private final @NotNull Main plugin;
+	private final @NotNull MSTBackpack plugin;
 	private final @NotNull Configuration defaults;
 	private final @Nullable String host;
 	private final int port;
@@ -71,7 +71,7 @@ public final class Config {
 	private @Nullable String commandUsage;
 	private @Nullable String commandDescription;
 
-	public Config(@NotNull Main plugin) {
+	public BackpackConfig(@NotNull MSTBackpack plugin) {
 		this.plugin = plugin;
 		this.plugin.saveDefaultConfig();
 		this.defaults = Objects.requireNonNull(config().getDefaults());

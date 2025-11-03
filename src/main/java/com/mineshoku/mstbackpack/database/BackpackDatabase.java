@@ -1,7 +1,7 @@
 package com.mineshoku.mstbackpack.database;
 
-import com.mineshoku.mstbackpack.Info;
-import com.mineshoku.mstbackpack.Main;
+import com.mineshoku.mstbackpack.BackpackInfo;
+import com.mineshoku.mstbackpack.MSTBackpack;
 import com.mineshoku.mstutils.database.Database;
 import com.mineshoku.mstutils.managers.ExecutorManager;
 import com.mineshoku.mstutils.models.Pair;
@@ -11,11 +11,12 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.sql.*;
-import java.util.*;
+import java.util.Collections;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
-public abstract class DatabaseImpl extends Database {
+public abstract class BackpackDatabase extends Database {
 	private static final @NotNull String POOL_NAME = "MSTBackpack";
 	protected static final @NotNull String TABLE_PLAYERS = "MSTBackpackPlayers";
 	protected static final @NotNull String TABLE_PROFILES = "MSTBackpackProfiles";
@@ -30,12 +31,12 @@ public abstract class DatabaseImpl extends Database {
 	private static final @NotNull String STATEMENT_GET_INFO = new SelectBuilder(TABLE_PROFILES).columns(COLUMN_ITEMS, COLUMN_EXTRAS).
 			where(COLUMN_PLAYER_ID, COLUMN_PROFILE_ID).build();
 
-	protected final @NotNull Main plugin;
+	protected final @NotNull MSTBackpack plugin;
 	private final @NotNull String statementSaveItems;
 	private final @NotNull String statementSaveExtrasPlayer;
 	private final @NotNull String statementSaveExtrasProfile;
 
-	protected DatabaseImpl(@NotNull Main plugin, @NotNull String url, @Nullable String username, @Nullable String password) throws ClassNotFoundException {
+	protected BackpackDatabase(@NotNull MSTBackpack plugin, @NotNull String url, @Nullable String username, @Nullable String password) throws ClassNotFoundException {
 		super(url, POOL_NAME, username, password);
 		this.plugin = plugin;
 		this.statementSaveItems = new InsertBuilder(TABLE_PROFILES).columns(COLUMN_PLAYER_ID, COLUMN_PROFILE_ID, COLUMN_ITEMS).
@@ -88,10 +89,10 @@ public abstract class DatabaseImpl extends Database {
 	}
 
 	@NotNull
-	public final CompletableFuture<@NotNull Info> getInfo(@NotNull UUID playerID, @NotNull UUID profileID) {
+	public final CompletableFuture<@NotNull BackpackInfo> getInfo(@NotNull UUID playerID, @NotNull UUID profileID) {
 		return CompletableFuture.supplyAsync(() -> {
 			try (Connection connection = getConnection()) {
-				List<ItemStack> items = null;
+				ItemStack[] items = null;
 				int extrasProfile = 0;
 				try (PreparedStatement statement = connection.prepareStatement(STATEMENT_GET_INFO)) {
 					statement.setString(1, playerID.toString());
@@ -100,26 +101,22 @@ public abstract class DatabaseImpl extends Database {
 						if (result.next()) {
 							Object bytes = result.getObject(1);
 							if (bytes != null) {
-								items = Arrays.stream(ItemStack.deserializeItemsFromBytes(result.getBytes(1))).
-										map(item -> item.isEmpty() ? null : item).toList();
-								if (items.stream().noneMatch(Objects::nonNull)) {
-									items = null;
-								}
+								items = ItemStack.deserializeItemsFromBytes(result.getBytes(1));
 							}
 							extrasProfile = result.getInt(2);
 						}
 					}
 				}
 				int extrasPlayer = getExtrasPlayer(connection, playerID);
-				return new Info(playerID, profileID, items, extrasPlayer, extrasProfile);
+				return new BackpackInfo(playerID, profileID, extrasPlayer, extrasProfile, items);
 			} catch (SQLException e) {
 				throw new CompletionException(e);
 			}
-		}, ExecutorManager.DATABASE);
+		}, ExecutorManager.instance().database);
 	}
 
 	@NotNull
-	public final CompletableFuture<Void> saveItems(@NotNull Info info) {
+	public final CompletableFuture<Void> saveItems(@NotNull BackpackInfo info) {
 		return CompletableFuture.runAsync(() -> {
 			try (Connection connection = getConnection()) {
 				try (PreparedStatement statement = connection.prepareStatement(this.statementSaveItems)) {
@@ -131,13 +128,14 @@ public abstract class DatabaseImpl extends Database {
 			} catch (SQLException e) {
 				throw new CompletionException(e);
 			}
-		}, ExecutorManager.DATABASE);
+		}, ExecutorManager.instance().database);
 	}
 
 	@NotNull
-	public final CompletableFuture<Void> updateExtrasAsync(@NotNull UUID playerID, @Nullable UUID profileID, int delta,
-														   @NonNegative int maxPlayer, @NonNegative int maxProfile) {
-		return delta == 0 ? CompletableFuture.completedFuture(null) : CompletableFuture.runAsync(() -> {
+	public final CompletableFuture<Void> updateExtrasAsync(@NotNull UUID playerID, @Nullable UUID profileID, int delta) {
+		if (delta == 0) return CompletableFuture.completedFuture(null);
+		int maxPlayer = this.plugin.config().amountExtraPlayerMax(), maxProfile = this.plugin.config().amountExtraProfileMax();
+		return CompletableFuture.runAsync(() -> {
 			try (Connection connection = getConnection()) {
 				if (profileID == null) {
 					try (PreparedStatement statement = connection.prepareStatement(this.statementSaveExtrasPlayer)) {
@@ -161,7 +159,7 @@ public abstract class DatabaseImpl extends Database {
 			} catch (SQLException e) {
 				throw new CompletionException(e);
 			}
-		}, ExecutorManager.DATABASE);
+		}, ExecutorManager.instance().database);
 	}
 
 	@NotNull

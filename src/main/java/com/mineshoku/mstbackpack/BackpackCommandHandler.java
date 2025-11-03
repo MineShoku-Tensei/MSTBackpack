@@ -17,7 +17,7 @@ import java.util.*;
 import java.util.concurrent.CompletionException;
 import java.util.stream.Stream;
 
-public final class CommandHandler implements CommandExecutor, TabCompleter {
+public final class BackpackCommandHandler implements CommandExecutor, TabCompleter {
 	public static final @NotNull @Unmodifiable List<@NotNull String> BASE = List.of("help", "reload", "open", "clear", "upgrade", "downgrade");
 	public static final @NotNull String PERMISSION_ADVANCED = "mst.backpack.advanced";
 	public static final @NotNull String EXTRAS_SET_PLAYER = "-";
@@ -34,11 +34,11 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 			""");
 
 	private final @NotNull PluginCommand command;
-	private final @NotNull Main plugin;
+	private final @NotNull MSTBackpack plugin;
 	private final @NotNull Map<@NotNull UUID, @NotNull ClearInfo> timesPlayers = new HashMap<>();
 	private final @NotNull Map<@NotNull String, @NotNull ClearInfo> timesOthers = new HashMap<>();
 
-	public CommandHandler(@NotNull Main plugin) {
+	public BackpackCommandHandler(@NotNull MSTBackpack plugin) {
 		this.command = Objects.requireNonNull(plugin.getCommand("backpack"));
 		this.command.setExecutor(this);
 		this.command.setTabCompleter(this);
@@ -106,7 +106,7 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 							}
 							Utils.sendMessage(sender, this.plugin.config().messageClearResend(offlinePlayer, profileID));
 						} else {
-							this.plugin.database().saveItems(new Info(playerID, profileID, null, 0, 0)).
+							this.plugin.database().saveItems(new BackpackInfo(playerID, profileID, 0, 0)).
 									whenComplete((ignored, e) -> {
 										Component msg;
 										if (e == null) {
@@ -131,8 +131,7 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 					}
 					amount = Math.abs(amount);
 					int delta = idx == INDEX_DOWNGRADE ? Math.negateExact(amount) : amount;
-					this.plugin.database().updateExtrasAsync(playerID, profileID, delta,
-							this.plugin.config().amountExtraPlayerMax(), this.plugin.config().amountExtraProfileMax()).
+					this.plugin.database().updateExtrasAsync(playerID, profileID, delta).
 							thenCompose(v -> this.plugin.database().getExtras(playerID, profileID)).
 							whenComplete((extras, e) -> {
 								if (e == null) {
@@ -162,7 +161,7 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 		}
 		this.plugin.database().getInfo(playerID, profileID).thenAcceptAsync(info -> {
 			try {
-				if (new Menu(this.plugin, player, info).openInventory() == null) {
+				if (new BackpackMenu(this.plugin, player, info).openInventory() == null) {
 					Utils.sendMessage(player, this.plugin.config().messageOpenFail());
 				}
 			} catch (Exception e) {
