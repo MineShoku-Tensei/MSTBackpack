@@ -3,6 +3,7 @@ package com.mineshoku.mstbackpack;
 import com.mineshoku.mstutils.InventoryUtils;
 import com.mineshoku.mstutils.TextUtils;
 import com.mineshoku.mstutils.Utils;
+import com.mineshoku.mstutils.managers.ExecutorManager;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -25,14 +26,13 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
-public class Menu implements Listener {
-	protected final @NotNull Main plugin;
+public class BackpackMenu implements Listener {
+	protected final @NotNull MSTBackpack plugin;
 	protected final @NotNull Player player;
-	protected final @NotNull Info info;
-	protected final Config.@NotNull Type type;
+	protected final @NotNull BackpackInfo info;
+	protected final BackpackConfig.@NotNull Type type;
 	protected final boolean topBorder;
 	private @Nullable @NonNegative Integer slotClose;
 	private @Nullable @NonNegative Integer slotNext;
@@ -48,7 +48,7 @@ public class Menu implements Listener {
 	private @Nullable TreeMap<@NotNull Integer, @Nullable ItemStack> pageContent;
 	private @Nullable @Unmodifiable NavigableMap<@NotNull Integer, @NotNull Boolean> extraBorder;
 
-	public Menu(@NotNull Main plugin, @NotNull Player player, @NotNull Info info) throws NullPointerException {
+	public BackpackMenu(@NotNull MSTBackpack plugin, @NotNull Player player, @NotNull BackpackInfo info) throws NullPointerException {
 		this.plugin = plugin;
 		this.player = player;
 		this.info = info;
@@ -72,7 +72,7 @@ public class Menu implements Listener {
 	}
 
 	@NonNegative
-	private static int totalSlots(@NonNegative int total, Config.@NotNull Type type, boolean topBorder) {
+	private static int totalSlots(@NonNegative int total, BackpackConfig.@NotNull Type type, boolean topBorder) {
 		return switch (type) {
 			case PAGES -> Math.multiplyExact(total, InventoryUtils.slotsFromLines(InventoryUtils.INVENTORY_MAX_LINES - (topBorder ? 2 : 1)));
 			case LINES -> Math.multiplyExact(total, InventoryUtils.LINE_SLOTS);
@@ -230,13 +230,13 @@ public class Menu implements Listener {
 	}
 
 	@NotNull
-	private ItemStack fromConfigPageItem(Config.@NotNull PageItem pageItem) {
+	private ItemStack fromConfigPageItem(BackpackConfig.@NotNull PageItem pageItem) {
 		return pageItem.toItemStack(this.currentPage, this.maxPages, this.info.extrasPlayer(), this.info.extrasProfile(),
 				this.plugin.config().amountExtraPlayerMax(), this.plugin.config().amountExtraProfileMax());
 	}
 
 	@NonNegative
-	private int calculateSlot(Config.@NotNull PageItem pageItem) {
+	private int calculateSlot(BackpackConfig.@NotNull PageItem pageItem) {
 		int calculated = pageItem.slot();
 		while (calculated < 0) {
 			calculated += this.inventorySize;
@@ -248,12 +248,12 @@ public class Menu implements Listener {
 	}
 
 	protected final void updateBorder() {
-		Config.PageItem menuIndicator = this.plugin.config().menuIndicator();
-		Config.PageItem menuClose = this.plugin.config().menuClose();
-		Config.PageItem menuNext = this.plugin.config().menuNext();
-		Config.PageItem menuPrevious = this.plugin.config().menuPrevious();
-		Config.PageItem menuBorderStatic = this.plugin.config().menuBorderStatic();
-		Config.PageItem menuBorderUnlockable = this.plugin.config().menuBorderUnlockable();
+		BackpackConfig.PageItem menuIndicator = this.plugin.config().menuIndicator();
+		BackpackConfig.PageItem menuClose = this.plugin.config().menuClose();
+		BackpackConfig.PageItem menuNext = this.plugin.config().menuNext();
+		BackpackConfig.PageItem menuPrevious = this.plugin.config().menuPrevious();
+		BackpackConfig.PageItem menuBorderStatic = this.plugin.config().menuBorderStatic();
+		BackpackConfig.PageItem menuBorderUnlockable = this.plugin.config().menuBorderUnlockable();
 		ItemStack borderStatic = fromConfigPageItem(menuBorderStatic), borderUnlockable = fromConfigPageItem(menuBorderUnlockable);
 		int slotClose = calculateSlot(menuClose), slotNext = calculateSlot(menuNext), slotPrevious = calculateSlot(menuPrevious), slotIndicator;
 		this.slotClose = isLegalBorder(slotClose) ? slotClose : null;
@@ -350,25 +350,23 @@ public class Menu implements Listener {
 				}
 			}
 		}
-		Info saveInfo = this.info.withItems(this.plugin.config().condense() ? InventoryUtils.condenseItems(items) : items);
-		Utils.sendToSync(CompletableFuture.supplyAsync(() -> {
-			try {
-				this.plugin.database().saveItems(saveInfo);
-				return true;
-			} catch (Exception e) {
-				Utils.logException(this.plugin, null, e);
-				return false;
-			}
-		}), this.plugin, success -> {
+		BackpackInfo saveInfo = this.info.withItems(this.plugin.config().condense() ? InventoryUtils.condenseItems(items) : items);
+		this.plugin.database().saveItems(saveInfo).handle((ignored, e) -> {
+			if (e == null) return true;
+			Utils.logException(this.plugin, e);
+			return false;
+		}).thenAcceptAsync(success -> {
 			if (!this.player.isOnline()) return;
 			if (success) {
 				try {
 					this.player.saveData();
-				} catch (Exception ignored) {}
+				} catch (Exception e) {
+					Utils.logException(this.plugin, e);
+				}
 			} else {
 				this.player.getInventory().setContents(this.playerInitialItems);
 			}
-		});
+		}, ExecutorManager.mainThreadExecutor(this.plugin));
 	}
 
 	@EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
