@@ -2,7 +2,9 @@ package com.mineshoku.mstbackpack.database;
 
 import com.mineshoku.mstbackpack.Info;
 import com.mineshoku.mstbackpack.Main;
-import com.mineshoku.mstutils.Pair;
+import com.mineshoku.mstutils.database.Database;
+import com.mineshoku.mstutils.managers.ExecutorManager;
+import com.mineshoku.mstutils.models.Pair;
 import org.bukkit.inventory.ItemStack;
 import org.checkerframework.checker.index.qual.NonNegative;
 import org.jetbrains.annotations.NotNull;
@@ -10,8 +12,10 @@ import org.jetbrains.annotations.Nullable;
 
 import java.sql.*;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
-public abstract class Database extends com.mineshoku.mstutils.database.Database {
+public abstract class DatabaseImpl extends Database {
 	private static final @NotNull String POOL_NAME = "MSTBackpack";
 	protected static final @NotNull String TABLE_PLAYERS = "MSTBackpackPlayers";
 	protected static final @NotNull String TABLE_PROFILES = "MSTBackpackProfiles";
@@ -31,7 +35,7 @@ public abstract class Database extends com.mineshoku.mstutils.database.Database 
 	private final @NotNull String statementSaveExtrasPlayer;
 	private final @NotNull String statementSaveExtrasProfile;
 
-	protected Database(@NotNull Main plugin, @NotNull String url, @Nullable String username, @Nullable String password) throws ClassNotFoundException {
+	protected DatabaseImpl(@NotNull Main plugin, @NotNull String url, @Nullable String username, @Nullable String password) throws ClassNotFoundException {
 		super(url, POOL_NAME, username, password);
 		this.plugin = plugin;
 		this.statementSaveItems = new InsertBuilder(TABLE_PROFILES).columns(COLUMN_PLAYER_ID, COLUMN_PROFILE_ID, COLUMN_ITEMS).
@@ -83,79 +87,94 @@ public abstract class Database extends com.mineshoku.mstutils.database.Database 
 		}
 	}
 
-	@Nullable
-	public final Info getInfo(@NotNull UUID playerID, @NotNull UUID profileID) throws SQLException {
-		try (Connection connection = getConnection()) {
-			List<ItemStack> items = null;
-			int extrasProfile = 0;
-			try (PreparedStatement statement = connection.prepareStatement(STATEMENT_GET_INFO)) {
-				statement.setString(1, playerID.toString());
-				statement.setString(2, profileID.toString());
-				try (ResultSet result = statement.executeQuery()) {
-					if (result.next()) {
-						Object bytes = result.getObject(1);
-						if (bytes != null) {
-							items = Arrays.stream(ItemStack.deserializeItemsFromBytes(result.getBytes(1))).
-									map(item -> item.isEmpty() ? null : item).toList();
-							if (items.stream().noneMatch(Objects::nonNull)) {
-								items = null;
+	@NotNull
+	public final CompletableFuture<@NotNull Info> getInfo(@NotNull UUID playerID, @NotNull UUID profileID) {
+		return CompletableFuture.supplyAsync(() -> {
+			try (Connection connection = getConnection()) {
+				List<ItemStack> items = null;
+				int extrasProfile = 0;
+				try (PreparedStatement statement = connection.prepareStatement(STATEMENT_GET_INFO)) {
+					statement.setString(1, playerID.toString());
+					statement.setString(2, profileID.toString());
+					try (ResultSet result = statement.executeQuery()) {
+						if (result.next()) {
+							Object bytes = result.getObject(1);
+							if (bytes != null) {
+								items = Arrays.stream(ItemStack.deserializeItemsFromBytes(result.getBytes(1))).
+										map(item -> item.isEmpty() ? null : item).toList();
+								if (items.stream().noneMatch(Objects::nonNull)) {
+									items = null;
+								}
 							}
+							extrasProfile = result.getInt(2);
 						}
-						extrasProfile = result.getInt(2);
 					}
 				}
+				int extrasPlayer = getExtrasPlayer(connection, playerID);
+				return new Info(playerID, profileID, items, extrasPlayer, extrasProfile);
+			} catch (SQLException e) {
+				throw new CompletionException(e);
 			}
-			int extrasPlayer = getExtrasPlayer(connection, playerID);
-			return new Info(playerID, profileID, items, extrasPlayer, extrasProfile);
-		}
-	}
-
-	public final void saveItems(@NotNull Info info) throws SQLException {
-		try (Connection connection = getConnection()) {
-			try (PreparedStatement statement = connection.prepareStatement(this.statementSaveItems)) {
-				statement.setString(1, info.playerID().toString());
-				statement.setString(2, info.profileID().toString());
-				statement.setBytes(3, info.items() == null ? NULL_ITEMS_BYTES : ItemStack.serializeItemsAsBytes(info.items()));
-				statement.executeUpdate();
-			}
-		}
-	}
-
-	public final void updateExtrasPlayer(@NotNull UUID playerID, int delta, @NonNegative int max) throws SQLException {
-		if (delta == 0) return;
-		try (Connection connection = getConnection()) {
-			try (PreparedStatement statement = connection.prepareStatement(this.statementSaveExtrasPlayer)) {
-				statement.setString(1, playerID.toString());
-				statement.setInt(2, delta);
-				statement.setInt(3, 0);
-				statement.setInt(4, max);
-				statement.executeUpdate();
-			}
-		}
-	}
-
-	public final void updateExtrasProfile(@NotNull UUID playerID, @NotNull UUID profileID, int delta, @NonNegative int max) throws SQLException {
-		if (delta == 0) return;
-		try (Connection connection = getConnection()) {
-			try (PreparedStatement statement = connection.prepareStatement(this.statementSaveExtrasProfile)) {
-				statement.setString(1, playerID.toString());
-				statement.setString(2, profileID.toString());
-				statement.setBytes(3, NULL_ITEMS_BYTES);
-				statement.setInt(4, delta);
-				statement.setInt(5, 0);
-				statement.setInt(6, max);
-				statement.executeUpdate();
-			}
-		}
+		}, ExecutorManager.DATABASE);
 	}
 
 	@NotNull
-	public final Pair<@NotNull @NonNegative Integer, @NotNull @NonNegative Integer>
-	getExtras(@NotNull UUID playerID, @Nullable UUID profileID) throws SQLException {
-		try (Connection connection = getConnection()) {
-			int extrasPlayer = getExtrasPlayer(connection, playerID),
-					extrasProfile = profileID == null ? 0 : getExtrasProfile(connection, playerID, profileID);
-			return Pair.of(extrasPlayer, extrasProfile);
-		}
+	public final CompletableFuture<Void> saveItems(@NotNull Info info) {
+		return CompletableFuture.runAsync(() -> {
+			try (Connection connection = getConnection()) {
+				try (PreparedStatement statement = connection.prepareStatement(this.statementSaveItems)) {
+					statement.setString(1, info.playerID().toString());
+					statement.setString(2, info.profileID().toString());
+					statement.setBytes(3, info.items() == null ? NULL_ITEMS_BYTES : ItemStack.serializeItemsAsBytes(info.items()));
+					statement.executeUpdate();
+				}
+			} catch (SQLException e) {
+				throw new CompletionException(e);
+			}
+		}, ExecutorManager.DATABASE);
+	}
+
+	@NotNull
+	public final CompletableFuture<Void> updateExtrasAsync(@NotNull UUID playerID, @Nullable UUID profileID, int delta,
+														   @NonNegative int maxPlayer, @NonNegative int maxProfile) {
+		return delta == 0 ? CompletableFuture.completedFuture(null) : CompletableFuture.runAsync(() -> {
+			try (Connection connection = getConnection()) {
+				if (profileID == null) {
+					try (PreparedStatement statement = connection.prepareStatement(this.statementSaveExtrasPlayer)) {
+						statement.setString(1, playerID.toString());
+						statement.setInt(2, delta);
+						statement.setInt(3, 0);
+						statement.setInt(4, maxPlayer);
+						statement.executeUpdate();
+					}
+				} else {
+					try (PreparedStatement statement = connection.prepareStatement(this.statementSaveExtrasProfile)) {
+						statement.setString(1, playerID.toString());
+						statement.setString(2, profileID.toString());
+						statement.setBytes(3, NULL_ITEMS_BYTES);
+						statement.setInt(4, delta);
+						statement.setInt(5, 0);
+						statement.setInt(6, maxProfile);
+						statement.executeUpdate();
+					}
+				}
+			} catch (SQLException e) {
+				throw new CompletionException(e);
+			}
+		}, ExecutorManager.DATABASE);
+	}
+
+	@NotNull
+	public final CompletableFuture<@NotNull Pair<@NotNull @NonNegative Integer, @NotNull @NonNegative Integer>>
+	getExtras(@NotNull UUID playerID, @Nullable UUID profileID) {
+		return CompletableFuture.supplyAsync(() -> {
+			try (Connection connection = getConnection()) {
+				int extrasPlayer = getExtrasPlayer(connection, playerID),
+						extrasProfile = profileID == null ? 0 : getExtrasProfile(connection, playerID, profileID);
+				return Pair.of(extrasPlayer, extrasProfile);
+			} catch (SQLException e) {
+				throw new CompletionException(e);
+			}
+		});
 	}
 }

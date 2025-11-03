@@ -1,16 +1,15 @@
 package com.mineshoku.mstbackpack;
 
-import com.mineshoku.mstbackpack.database.Database;
-import com.mineshoku.mstbackpack.database.Local;
-import com.mineshoku.mstbackpack.database.MySQL;
+import com.mineshoku.mstbackpack.database.DatabaseImpl;
+import com.mineshoku.mstbackpack.database.LocalImpl;
+import com.mineshoku.mstbackpack.database.MySQLImpl;
 import com.mineshoku.mstutils.Utils;
-import com.zaxxer.hikari.pool.HikariPool;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class Main extends JavaPlugin {
 	private Config config;
-	private Database database;
+	private DatabaseImpl database;
 	private CommandHandler commandHandler;
 
 	public void onEnable() {
@@ -19,18 +18,18 @@ public class Main extends JavaPlugin {
 		try {
 			String host = this.config.host();
 			if (host == null || host.isBlank()) {
-				this.database = new Local(this);
+				this.database = new LocalImpl(this);
 			} else {
 				try {
-					this.database = new MySQL(this, host);
-				} catch (HikariPool.PoolInitializationException e) {
+					this.database = new MySQLImpl(this, host);
+				} catch (Exception e) {
 					failed = true;
 					getLogger().severe("Failed connecting to MySQL DB!");
 				}
 			}
 		} catch (Exception e) {
 			failed = true;
-			Utils.logException(this, null, e);
+			Utils.logException(this, e);
 		}
 		if (failed) {
 			getLogger().severe("Disabling plugin");
@@ -44,7 +43,7 @@ public class Main extends JavaPlugin {
 		return this.config;
 	}
 
-	public Database database() {
+	public DatabaseImpl database() {
 		return this.database;
 	}
 
@@ -55,11 +54,5 @@ public class Main extends JavaPlugin {
 	public void reload() {
 		config().reload();
 		commandHandler().reload();
-	}
-
-	public void onDisable() {
-		if (database() != null) {
-			database().close();
-		}
 	}
 }

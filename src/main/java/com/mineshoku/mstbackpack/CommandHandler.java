@@ -1,9 +1,9 @@
 package com.mineshoku.mstbackpack;
 
-import com.mineshoku.mstutils.Pair;
 import com.mineshoku.mstutils.ProfileUtils;
 import com.mineshoku.mstutils.TextUtils;
 import com.mineshoku.mstutils.Utils;
+import com.mineshoku.mstutils.managers.ExecutorManager;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -14,7 +14,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.stream.Stream;
 
 public final class CommandHandler implements CommandExecutor, TabCompleter {
@@ -56,7 +56,7 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 					this.plugin.reload();
 					Utils.sendMessage(sender, this.plugin.config().messageReloaded());
 				} catch (Exception e) {
-					Utils.logException(this.plugin, null, e);
+					Utils.logException(this.plugin, e);
 					Utils.sendMessage(sender, this.plugin.config().messageCommandFailed());
 				}
 				return true;
@@ -106,19 +106,17 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 							}
 							Utils.sendMessage(sender, this.plugin.config().messageClearResend(offlinePlayer, profileID));
 						} else {
-							Utils.sendToSync(CompletableFuture.supplyAsync(() -> {
-								try {
-									this.plugin.database().saveItems(new Info(playerID, profileID, null, 0, 0));
-									return true;
-								} catch (Exception e) {
-									Utils.logException(this.plugin, null, e);
-									return false;
-								}
-							}) , this.plugin, success -> {
-								Component msg = success ? this.plugin.config().messageClearFinish(offlinePlayer, profileID) :
-										this.plugin.config().messageCommandFailed();
-								Utils.sendMessage(sender, msg);
-							});
+							this.plugin.database().saveItems(new Info(playerID, profileID, null, 0, 0)).
+									whenComplete((ignored, e) -> {
+										Component msg;
+										if (e == null) {
+											msg = this.plugin.config().messageClearFinish(offlinePlayer, profileID);
+										} else {
+											Utils.logException(this.plugin, e);
+											msg = this.plugin.config().messageCommandFailed();
+										}
+										Utils.sendMessage(sender, msg);
+									});
 						}
 					}
 				} else {
@@ -132,40 +130,18 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 						}
 					}
 					amount = Math.abs(amount);
-					int delta = idx == INDEX_DOWNGRADE ? Math.negateExact(amount) : amount,
-							playerMax = this.plugin.config().amountExtraPlayerMax(),
-							profileMax = this.plugin.config().amountExtraProfileMax();
-					Utils.sendToSync(CompletableFuture.supplyAsync(() -> {
-						try {
-							if (profileID == null) {
-								this.plugin.database().updateExtrasPlayer(playerID, delta, playerMax);
-							} else {
-								this.plugin.database().updateExtrasProfile(playerID, profileID, delta, profileMax);
-							}
-							return true;
-						} catch (Exception e) {
-							Utils.logException(this.plugin, null, e);
-							return false;
-						}
-					}).thenApplyAsync(success -> {
-						Pair<Integer, Integer> extras = null;
-						if (success) {
-							try {
-								extras = this.plugin.database().getExtras(playerID, profileID);
-							} catch (Exception e) {
-								Utils.logException(this.plugin, null, e);
-							}
-						}
-						return extras;
-					}) , this.plugin, extras -> {
-						if (extras == null) {
-							Utils.sendMessage(sender, this.plugin.config().messageCommandFailed());
-						} else if (profileID == null) {
-							Utils.sendMessage(sender, this.plugin.config().messageExtrasSetPlayer(offlinePlayer, extras.first()));
-						} else {
-							Utils.sendMessage(sender, this.plugin.config().messageExtrasSetProfile(offlinePlayer, profileID, extras.first(), extras.second()));
-						}
-					});
+					int delta = idx == INDEX_DOWNGRADE ? Math.negateExact(amount) : amount;
+					this.plugin.database().updateExtrasAsync(playerID, profileID, delta,
+							this.plugin.config().amountExtraPlayerMax(), this.plugin.config().amountExtraProfileMax()).
+							thenCompose(v -> this.plugin.database().getExtras(playerID, profileID)).
+							whenComplete((extras, e) -> {
+								if (e == null) {
+									Utils.sendMessage(sender, this.plugin.config().messageExtrasSet(offlinePlayer, profileID, extras.first(), extras.second()));
+								} else {
+									Utils.logException(this.plugin, e);
+									Utils.sendMessage(sender, plugin.config().messageCommandFailed());
+								}
+							});
 				}
 				return true;
 			}
@@ -184,25 +160,18 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
 			noProfile(sender);
 			return true;
 		}
-		Utils.sendToSync(CompletableFuture.supplyAsync(() -> {
+		this.plugin.database().getInfo(playerID, profileID).thenAcceptAsync(info -> {
 			try {
-				return this.plugin.database().getInfo(playerID, profileID);
-			} catch (Exception e) {
-				Utils.logException(this.plugin, null, e);
-				return null;
-			}
-		}), this.plugin, info -> {
-			boolean failed = info == null;
-			if (!failed) {
-				try {
-					failed = new Menu(this.plugin, player, info).openInventory() == null;
-				} catch (Exception e) {
-					Utils.logException(this.plugin, null, e);
+				if (new Menu(this.plugin, player, info).openInventory() == null) {
+					Utils.sendMessage(player, this.plugin.config().messageOpenFail());
 				}
+			} catch (Exception e) {
+				throw new CompletionException(e);
 			}
-			if (failed) {
-				Utils.sendMessage(player, this.plugin.config().messageOpenFail());
-			}
+		}, ExecutorManager.mainThreadExecutor(this.plugin)).exceptionally(e -> {
+			Utils.logException(this.plugin, e);
+			Utils.sendMessage(player, this.plugin.config().messageOpenFail());
+			return null;
 		});
 		return true;
 	}

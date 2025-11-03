@@ -298,26 +298,25 @@ public final class Config {
 	}
 
 	@Nullable
-	public Component messageExtrasSetPlayer(@NotNull OfflinePlayer offlinePlayer, @NonNegative int extrasPlayer) {
-		return this.messageExtrasSetPlayer == null ? null :
-				Utils.toRichComponent(this.messageExtrasSetPlayer,
-						tagResolverPlayer(offlinePlayer),
-						Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS, extrasPlayer),
-						Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS_MAX, amountExtraPlayerMax())
-				);
-	}
-
-	@Nullable
-	public Component messageExtrasSetProfile(@NotNull OfflinePlayer offlinePlayer, @NotNull UUID profileID,
-											 @NonNegative int extrasPlayer, @NonNegative int extrasProfile) {
-		return this.messageExtrasSetProfile == null ? null :
-				Utils.toRichComponent(this.messageExtrasSetProfile,
-						tagResolverPlayerProfile(offlinePlayer, profileID),
-						Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS, extrasProfile),
-						Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS_MAX, amountExtraProfileMax()),
-						Utils.unparsedPlaceholder(PLACEHOLDER_TOTAL, extrasPlayer + extrasProfile),
-						Utils.unparsedPlaceholder(PLACEHOLDER_TOTAL_MAX, amountExtrasMax())
-				);
+	public Component messageExtrasSet(@NotNull OfflinePlayer offlinePlayer, @Nullable UUID profileID,
+									  @NonNegative int extrasPlayer, @NonNegative int extrasProfile) {
+		return profileID == null ? (
+				this.messageExtrasSetPlayer == null ? null :
+						Utils.toRichComponent(this.messageExtrasSetPlayer,
+								tagResolverPlayer(offlinePlayer),
+								Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS, extrasPlayer),
+								Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS_MAX, amountExtraPlayerMax())
+						)
+		) : (
+				this.messageExtrasSetProfile == null ? null :
+						Utils.toRichComponent(this.messageExtrasSetProfile,
+								tagResolverPlayerProfile(offlinePlayer, profileID),
+								Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS, extrasProfile),
+								Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS_MAX, amountExtraProfileMax()),
+								Utils.unparsedPlaceholder(PLACEHOLDER_TOTAL, extrasPlayer + extrasProfile),
+								Utils.unparsedPlaceholder(PLACEHOLDER_TOTAL_MAX, amountExtrasMax())
+						)
+		);
 	}
 
 	@Nullable

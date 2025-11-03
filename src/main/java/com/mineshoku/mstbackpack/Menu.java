@@ -3,6 +3,8 @@ package com.mineshoku.mstbackpack;
 import com.mineshoku.mstutils.InventoryUtils;
 import com.mineshoku.mstutils.TextUtils;
 import com.mineshoku.mstutils.Utils;
+import com.mineshoku.mstutils.managers.ExecutorManager;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -25,7 +27,6 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 public class Menu implements Listener {
@@ -351,24 +352,22 @@ public class Menu implements Listener {
 			}
 		}
 		Info saveInfo = this.info.withItems(this.plugin.config().condense() ? InventoryUtils.condenseItems(items) : items);
-		Utils.sendToSync(CompletableFuture.supplyAsync(() -> {
-			try {
-				this.plugin.database().saveItems(saveInfo);
-				return true;
-			} catch (Exception e) {
-				Utils.logException(this.plugin, null, e);
-				return false;
-			}
-		}), this.plugin, success -> {
+		this.plugin.database().saveItems(saveInfo).handle((ignored, e) -> {
+			if (e == null) return true;
+			Utils.logException(this.plugin, e);
+			return false;
+		}).thenAcceptAsync(success -> {
 			if (!this.player.isOnline()) return;
 			if (success) {
 				try {
 					this.player.saveData();
-				} catch (Exception ignored) {}
+				} catch (Exception e) {
+					Utils.logException(this.plugin, e);
+				}
 			} else {
 				this.player.getInventory().setContents(this.playerInitialItems);
 			}
-		});
+		}, ExecutorManager.mainThreadExecutor(this.plugin));
 	}
 
 	@EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
