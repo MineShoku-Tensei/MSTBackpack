@@ -21,7 +21,7 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 	public static final @NotNull @Unmodifiable List<@NotNull String> BASE = List.of("help", "reload", "open", "clear", "upgrade", "downgrade");
 	public static final @NotNull String PERMISSION_ADVANCED = "mst.backpack.advanced";
 	public static final @NotNull String EXTRAS_SET_PLAYER = "-";
-	public static final @NotNull String EXTRAS_CURRENT = ".";
+	public static final @NotNull String CURRENT = ".";
 	private static final @Positive int INDEX_OPEN = BASE.indexOf("open");
 	private static final @Positive int INDEX_CLEAR = BASE.indexOf("clear");
 	private static final @Positive int INDEX_UPGRADE = BASE.indexOf("upgrade");
@@ -39,12 +39,14 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 	private final @NotNull Map<@NotNull String, @NotNull ClearInfo> timesOthers = new HashMap<>();
 
 	public BackpackCommandHandler(@NotNull MSTBackpack plugin) {
+		if (plugin.backpackCommandHandler() != null) throw new IllegalStateException("DatabaseManager already initialized");
+		this.plugin = plugin;
 		this.command = Objects.requireNonNull(plugin.getCommand("backpack"));
 		this.command.setExecutor(this);
 		this.command.setTabCompleter(this);
-		this.plugin = plugin;
 	}
 
+	@Override
 	public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String @NotNull [] args) {
 		boolean advanced = sender.hasPermission(PERMISSION_ADVANCED);
 		UUID playerID, profileID;
@@ -54,10 +56,10 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 			if (idx == 1) {
 				try {
 					this.plugin.reload();
-					Utils.sendMessage(sender, this.plugin.config().messageReloaded());
+					Utils.sendMessage(sender, this.plugin.backpackConfig().messageReloaded());
 				} catch (Exception e) {
 					Utils.logException(this.plugin, e);
-					Utils.sendMessage(sender, this.plugin.config().messageCommandFailed());
+					Utils.sendMessage(sender, this.plugin.backpackConfig().messageCommandFailed());
 				}
 				return true;
 			}
@@ -65,18 +67,18 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 				Utils.sendMessage(sender, HELP);
 				return true;
 			}
-			boolean useCurrentPlayer = args[1].equals(EXTRAS_CURRENT);
+			boolean useCurrentPlayer = args[1].equals(CURRENT);
 			if ((idx == INDEX_OPEN || useCurrentPlayer) && !(sender instanceof Player)) return true;
 			OfflinePlayer offlinePlayer = useCurrentPlayer ? (Player) sender : Utils.offlinePlayerCached(args[1]);
 			if (offlinePlayer == null) {
-				Utils.sendMessage(sender, this.plugin.config().messageNotFoundPlayer());
+				Utils.sendMessage(sender, this.plugin.backpackConfig().messageNotFoundPlayer());
 				return true;
 			}
 			playerID = offlinePlayer.getUniqueId();
 			if ((idx == INDEX_UPGRADE || idx == INDEX_DOWNGRADE) && args[2].equals(EXTRAS_SET_PLAYER)) {
 				profileID = null;
 			} else {
-				if (args[2].equals(EXTRAS_CURRENT)) {
+				if (args[2].equals(CURRENT)) {
 					profileID = ProfileUtils.getCurrentProfileID(playerID);
 				} else {
 					UUID id = Utils.getUUID(args[2]);
@@ -94,26 +96,26 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 						return true;
 					}
 					long now = System.currentTimeMillis();
-					long clearTimeout = this.plugin.config().clearTimeout();
+					long clearTimeout = this.plugin.backpackConfig().clearTimeout();
 					if (clearTimeout != 0) {
 						ClearInfo info = (sender instanceof Player p) ? this.timesPlayers.remove(p.getUniqueId()) : this.timesOthers.remove(sender.getName());
-						if (info == null || (now - info.time() > this.plugin.config().clearTimeout())) {
+						if (info == null || (now - info.time() > this.plugin.backpackConfig().clearTimeout())) {
 							info = new ClearInfo(playerID, profileID, now);
 							if (sender instanceof Player p) {
 								this.timesPlayers.put(p.getUniqueId(), info);
 							} else {
 								this.timesOthers.put(sender.getName(), info);
 							}
-							Utils.sendMessage(sender, this.plugin.config().messageClearResend(offlinePlayer, profileID));
+							Utils.sendMessage(sender, this.plugin.backpackConfig().messageClearResend(offlinePlayer, profileID));
 						} else {
-							this.plugin.database().saveItems(new BackpackInfo(playerID, profileID, 0, 0)).
+							this.plugin.backpackDatabase().saveItems(new BackpackInfo(playerID, profileID, 0, 0)).
 									whenComplete((ignored, e) -> {
 										Component msg;
 										if (e == null) {
-											msg = this.plugin.config().messageClearFinish(offlinePlayer, profileID);
+											msg = this.plugin.backpackConfig().messageClearFinish(offlinePlayer, profileID);
 										} else {
 											Utils.logException(this.plugin, e);
-											msg = this.plugin.config().messageCommandFailed();
+											msg = this.plugin.backpackConfig().messageCommandFailed();
 										}
 										Utils.sendMessage(sender, msg);
 									});
@@ -131,14 +133,14 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 					}
 					amount = Math.abs(amount);
 					int delta = idx == INDEX_DOWNGRADE ? Math.negateExact(amount) : amount;
-					this.plugin.database().updateExtrasAsync(playerID, profileID, delta).
-							thenCompose(v -> this.plugin.database().getExtras(playerID, profileID)).
+					this.plugin.backpackDatabase().updateExtrasAsync(playerID, profileID, delta).
+							thenCompose(v -> this.plugin.backpackDatabase().getExtras(playerID, profileID)).
 							whenComplete((extras, e) -> {
 								if (e == null) {
-									Utils.sendMessage(sender, this.plugin.config().messageExtrasSet(offlinePlayer, profileID, extras.first(), extras.second()));
+									Utils.sendMessage(sender, this.plugin.backpackConfig().messageExtrasSet(offlinePlayer, profileID, extras.first(), extras.second()));
 								} else {
 									Utils.logException(this.plugin, e);
-									Utils.sendMessage(sender, plugin.config().messageCommandFailed());
+									Utils.sendMessage(sender, plugin.backpackConfig().messageCommandFailed());
 								}
 							});
 				}
@@ -151,7 +153,7 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 			playerID = player.getUniqueId();
 			profileID = ProfileUtils.getCurrentProfileID(playerID);
 			if (profileID == null) {
-				Utils.sendMessage(player, this.plugin.config().messageProfileNotSelected());
+				Utils.sendMessage(player, this.plugin.backpackConfig().messageProfileNotSelected());
 				return true;
 			}
 		}
@@ -159,48 +161,47 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 			noProfile(sender);
 			return true;
 		}
-		this.plugin.database().getInfo(playerID, profileID).thenAcceptAsync(info -> {
+		this.plugin.backpackDatabase().getInfo(playerID, profileID).thenAcceptAsync(info -> {
 			try {
 				if (new BackpackMenu(this.plugin, player, info).openInventory() == null) {
-					Utils.sendMessage(player, this.plugin.config().messageOpenFail());
+					Utils.sendMessage(player, this.plugin.backpackConfig().messageOpenFail());
 				}
 			} catch (Exception e) {
 				throw new CompletionException(e);
 			}
 		}, ExecutorManager.mainThreadExecutor(this.plugin)).exceptionally(e -> {
 			Utils.logException(this.plugin, e);
-			Utils.sendMessage(player, this.plugin.config().messageOpenFail());
+			Utils.sendMessage(player, this.plugin.backpackConfig().messageOpenFail());
 			return null;
 		});
 		return true;
 	}
 
+	@Override
 	@NotNull
 	public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, String @NotNull [] args) {
 		if (!sender.hasPermission(PERMISSION_ADVANCED)) return new ArrayList<>();
 		if (args.length == 0) return BASE;
-		if (args.length == 1) {
-			return BASE.stream().filter(cmd -> Utils.checkTabComplete(args[0], cmd)).toList();
-		}
+		if (args.length == 1) return BASE.stream().filter(cmd -> Utils.checkTabComplete(args[0], cmd)).toList();
 		int idx = BASE.indexOf(TextUtils.toLowerCase(args[0]));
 		if (idx < 2) return new ArrayList<>();
 		if (args.length == 2) {
 			Stream<String> stream = Bukkit.getOnlinePlayers().stream().map(Player::getName);
 			if (sender instanceof Player) {
-				stream = Stream.concat(Stream.of(EXTRAS_CURRENT), stream);
+				stream = Stream.concat(Stream.of(CURRENT), stream);
 			}
 			return stream.filter(cmd -> Utils.checkTabComplete(args[1], cmd)).toList();
 		}
 		if (args.length == 3) {
-			OfflinePlayer offlinePlayer = args[1].equals(EXTRAS_CURRENT) ? ((sender instanceof Player p) ? p : null) : Utils.offlinePlayerCached(args[1]);
+			OfflinePlayer offlinePlayer = args[1].equals(CURRENT) ? ((sender instanceof Player p) ? p : null) : Utils.offlinePlayerCached(args[1]);
 			if (offlinePlayer == null) return new ArrayList<>();
 			UUID playerID = offlinePlayer.getUniqueId();
 			List<UUID> profileIDs = ProfileUtils.getProfileIDs(playerID);
 			Stream<String> special = Stream.empty(), profiles = profileIDs == null ? Stream.empty() : profileIDs.stream().map(UUID::toString);
 			if (idx == INDEX_UPGRADE || idx == INDEX_DOWNGRADE) {
-				special = offlinePlayer.isOnline() ? Stream.of(EXTRAS_CURRENT, EXTRAS_SET_PLAYER) : Stream.of(EXTRAS_SET_PLAYER);
+				special = offlinePlayer.isOnline() ? Stream.of(CURRENT, EXTRAS_SET_PLAYER) : Stream.of(EXTRAS_SET_PLAYER);
 			} else if ((idx == INDEX_OPEN || idx == INDEX_CLEAR) && offlinePlayer.isOnline()) {
-				special = Stream.of(EXTRAS_CURRENT);
+				special = Stream.of(CURRENT);
 			}
 			return Stream.concat(special, profiles).filter(cmd -> Utils.checkTabComplete(args[2], cmd)).toList();
 		}
@@ -208,12 +209,12 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 	}
 
 	private void noProfile(@NotNull CommandSender sender) {
-		Utils.sendMessage(sender, this.plugin.config().messageNotFoundProfile());
+		Utils.sendMessage(sender, this.plugin.backpackConfig().messageNotFoundProfile());
 	}
 
 	public void reload() {
-		this.command.setUsage(this.plugin.config().commandUsage());
-		this.command.setDescription(this.plugin.config().commandDescription());
+		this.command.setUsage(this.plugin.backpackConfig().commandUsage());
+		this.command.setDescription(this.plugin.backpackConfig().commandDescription());
 	}
 
 	private record ClearInfo(@NotNull UUID playerID, @NotNull UUID profileID, @Positive long time) {}

@@ -4,6 +4,7 @@ import com.mineshoku.mstutils.InventoryUtils;
 import com.mineshoku.mstutils.TextUtils;
 import com.mineshoku.mstutils.Utils;
 import com.mineshoku.mstutils.managers.ExecutorManager;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -17,7 +18,6 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.checkerframework.checker.index.qual.NonNegative;
 import org.checkerframework.checker.index.qual.Positive;
 import org.jetbrains.annotations.Contract;
@@ -52,17 +52,17 @@ public class BackpackMenu implements Listener {
 		this.plugin = plugin;
 		this.player = player;
 		this.info = info;
-		this.type = this.plugin.config().type();
-		this.topBorder = this.plugin.config().menuBorder();
-		boolean menuShowUnlockable = this.plugin.config().menuShowUnlockable();
-		int totalSlots = totalSlots(this.plugin.config().calculateAmount(info.extrasPlayer(), info.extrasProfile()), this.type, this.topBorder),
-				totalSlotsPossibleWithExtras = totalSlots(this.plugin.config().amountTotalMax(), this.type, this.topBorder),
+		this.type = this.plugin.backpackConfig().type();
+		this.topBorder = this.plugin.backpackConfig().menuBorder();
+		boolean menuShowUnlockable = this.plugin.backpackConfig().menuShowUnlockable();
+		int totalSlots = totalSlots(this.plugin.backpackConfig().calculateAmount(info.extrasPlayer(), info.extrasProfile()), this.type, this.topBorder),
+				totalSlotsPossibleWithExtras = totalSlots(this.plugin.backpackConfig().amountTotalMax(), this.type, this.topBorder),
 				maxSlotsPerPage = InventoryUtils.slotsFromLines(InventoryUtils.INVENTORY_MAX_LINES - (this.topBorder ? 2 : 1));
-		this.pagesContent = itemsPages(this.info.items(), this.topBorder, maxSlotsPerPage, this.plugin.config().condense());
+		this.pagesContent = itemsPages(this.info.items(), this.topBorder, maxSlotsPerPage, this.plugin.backpackConfig().condense());
 		this.maxPages = maxPages(totalSlots, totalSlotsPossibleWithExtras, menuShowUnlockable, maxSlotsPerPage);
 		int lines = menuShowUnlockable || this.maxPages > 1 ? InventoryUtils.INVENTORY_MAX_LINES :
 				Math.ceilDiv(totalSlots, InventoryUtils.LINE_SLOTS) + (this.topBorder ? 2 : 1);
-		this.inventory = InventoryUtils.inventory(this.player, lines, this.plugin.config().menuTitle());
+		this.inventory = InventoryUtils.inventory(this.player, lines, this.plugin.backpackConfig().menuTitle());
 		this.inventorySize = this.inventory.getSize();
 		this.extraBorders = extraBorders(this.topBorder, this.inventorySize, this.maxPages,
 				totalSlots, totalSlotsPossibleWithExtras, maxSlotsPerPage);
@@ -232,7 +232,7 @@ public class BackpackMenu implements Listener {
 	@NotNull
 	private ItemStack fromConfigPageItem(BackpackConfig.@NotNull PageItem pageItem) {
 		return pageItem.toItemStack(this.currentPage, this.maxPages, this.info.extrasPlayer(), this.info.extrasProfile(),
-				this.plugin.config().amountExtraPlayerMax(), this.plugin.config().amountExtraProfileMax());
+				this.plugin.backpackConfig().amountExtraPlayerMax(), this.plugin.backpackConfig().amountExtraProfileMax());
 	}
 
 	@NonNegative
@@ -248,12 +248,12 @@ public class BackpackMenu implements Listener {
 	}
 
 	protected final void updateBorder() {
-		BackpackConfig.PageItem menuIndicator = this.plugin.config().menuIndicator();
-		BackpackConfig.PageItem menuClose = this.plugin.config().menuClose();
-		BackpackConfig.PageItem menuNext = this.plugin.config().menuNext();
-		BackpackConfig.PageItem menuPrevious = this.plugin.config().menuPrevious();
-		BackpackConfig.PageItem menuBorderStatic = this.plugin.config().menuBorderStatic();
-		BackpackConfig.PageItem menuBorderUnlockable = this.plugin.config().menuBorderUnlockable();
+		BackpackConfig.PageItem menuIndicator = this.plugin.backpackConfig().menuIndicator();
+		BackpackConfig.PageItem menuClose = this.plugin.backpackConfig().menuClose();
+		BackpackConfig.PageItem menuNext = this.plugin.backpackConfig().menuNext();
+		BackpackConfig.PageItem menuPrevious = this.plugin.backpackConfig().menuPrevious();
+		BackpackConfig.PageItem menuBorderStatic = this.plugin.backpackConfig().menuBorderStatic();
+		BackpackConfig.PageItem menuBorderUnlockable = this.plugin.backpackConfig().menuBorderUnlockable();
 		ItemStack borderStatic = fromConfigPageItem(menuBorderStatic), borderUnlockable = fromConfigPageItem(menuBorderUnlockable);
 		int slotClose = calculateSlot(menuClose), slotNext = calculateSlot(menuNext), slotPrevious = calculateSlot(menuPrevious), slotIndicator;
 		this.slotClose = isLegalBorder(slotClose) ? slotClose : null;
@@ -350,8 +350,8 @@ public class BackpackMenu implements Listener {
 				}
 			}
 		}
-		BackpackInfo saveInfo = this.info.withItems(this.plugin.config().condense() ? InventoryUtils.condenseItems(items) : items);
-		this.plugin.database().saveItems(saveInfo).handle((ignored, e) -> {
+		BackpackInfo saveInfo = this.info.withItems(this.plugin.backpackConfig().condense() ? InventoryUtils.condenseItems(items) : items);
+		this.plugin.backpackDatabase().saveItems(saveInfo).handle((ignored, e) -> {
 			if (e == null) return true;
 			Utils.logException(this.plugin, e);
 			return false;
@@ -396,11 +396,7 @@ public class BackpackMenu implements Listener {
 		if (!isLegalBorder(slot)) return;
 		boolean rightClick = event.getClick().isRightClick();
 		if (Objects.equals(slot, this.slotClose)) {
-			new BukkitRunnable() {
-				public void run() {
-					close();
-				}
-			}.runTaskLater(this.plugin, 1);
+			Bukkit.getScheduler().runTaskLater(this.plugin, this::close, 1);
 		} else if (Objects.equals(slot, this.slotNext)) {
 			if (rightClick) {
 				setLastPage();

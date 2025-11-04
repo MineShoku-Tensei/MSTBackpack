@@ -6,29 +6,31 @@ import com.mineshoku.mstbackpack.database.BackpackMySQL;
 import com.mineshoku.mstutils.Utils;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.jetbrains.annotations.ApiStatus;
 
 public class MSTBackpack extends JavaPlugin {
 	private static MSTBackpack instance;
 
-	private BackpackConfig config;
-	private BackpackDatabase database;
-	private BackpackCommandHandler commandHandler;
+	private BackpackConfig backpackConfig;
+	private BackpackDatabase backpackDatabase;
+	private BackpackCommandHandler backpackCommandHandler;
 
-	public void onLoad() {
+	public MSTBackpack() {
 		if (instance != null) throw new IllegalStateException("MSTBackpack main already present?");
 		instance = this;
 	}
 
+	@Override
 	public void onEnable() {
 		boolean failed = false;
-		this.config = new BackpackConfig(this);
+		this.backpackConfig = new BackpackConfig(this);
 		try {
-			String host = this.config.host();
+			String host = this.backpackConfig.host();
 			if (host == null || host.isBlank()) {
-				this.database = new BackpackLocalDB(this);
+				this.backpackDatabase = new BackpackLocalDB(this);
 			} else {
 				try {
-					this.database = new BackpackMySQL(this, host);
+					this.backpackDatabase = new BackpackMySQL(this, host);
 				} catch (Exception e) {
 					failed = true;
 					getLogger().severe("Failed connecting to MySQL DB!");
@@ -43,31 +45,33 @@ public class MSTBackpack extends JavaPlugin {
 			Bukkit.getPluginManager().disablePlugin(this);
 			return;
 		}
-		this.commandHandler = new BackpackCommandHandler(this);
+		this.backpackCommandHandler = new BackpackCommandHandler(this);
 	}
 
+	@Override
 	public void onDisable() {
 		instance = null;
 	}
 
+	@ApiStatus.Internal
 	static MSTBackpack instance() {
 		return instance;
 	}
 
-	public BackpackConfig config() {
-		return this.config;
+	public BackpackConfig backpackConfig() {
+		return this.backpackConfig;
 	}
 
-	public BackpackDatabase database() {
-		return this.database;
+	public BackpackDatabase backpackDatabase() {
+		return this.backpackDatabase;
 	}
 
-	public BackpackCommandHandler commandHandler() {
-		return this.commandHandler;
+	public BackpackCommandHandler backpackCommandHandler() {
+		return this.backpackCommandHandler;
 	}
 
 	public void reload() {
-		config().reload();
-		commandHandler().reload();
+		backpackConfig().reload();
+		backpackCommandHandler().reload();
 	}
 }
