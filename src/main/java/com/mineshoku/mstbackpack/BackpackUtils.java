@@ -15,17 +15,17 @@ public class BackpackUtils {
 
 	@NotNull
 	public static CompletableFuture<@Nullable List<@Nullable ItemStack>> getItems(@NotNull UUID playerID, @NotNull UUID profileID) {
-		return MSTBackpack.instance().database().getInfo(playerID, profileID).thenApply(BackpackInfo::items);
+		return MSTBackpack.instance().backpackDatabase().getInfo(playerID, profileID).thenApply(BackpackInfo::items);
 	}
 
 	@NotNull
 	public static CompletableFuture<Void> saveItems(@NotNull UUID playerID, @NotNull UUID profileID, @Nullable List<@Nullable ItemStack> items) {
-		return MSTBackpack.instance().database().saveItems(new BackpackInfo(playerID, profileID, 0, 0, items));
+		return MSTBackpack.instance().backpackDatabase().saveItems(new BackpackInfo(playerID, profileID, 0, 0, items));
 	}
 
 	@NotNull
 	private static CompletableFuture<Void> updateExtrasAsync(@NotNull UUID playerID, @Nullable UUID profileID, int delta) {
-		return MSTBackpack.instance().database().updateExtrasAsync(playerID, profileID, delta);
+		return MSTBackpack.instance().backpackDatabase().updateExtrasAsync(playerID, profileID, delta);
 	}
 
 	@NotNull
@@ -41,6 +41,6 @@ public class BackpackUtils {
 	@NotNull
 	public static CompletableFuture<@NotNull Pair<@NotNull @NonNegative Integer, @NotNull @NonNegative Integer>>
 	getExtras(@NotNull UUID playerID, @Nullable UUID profileID) {
-		return MSTBackpack.instance().database().getExtras(playerID, profileID);
+		return MSTBackpack.instance().backpackDatabase().getExtras(playerID, profileID);
 	}
 }

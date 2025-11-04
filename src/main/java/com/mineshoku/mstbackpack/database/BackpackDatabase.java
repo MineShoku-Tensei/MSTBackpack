@@ -17,7 +17,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
 public abstract class BackpackDatabase extends Database {
-	private static final @NotNull String POOL_NAME = "MSTBackpack";
 	protected static final @NotNull String TABLE_PLAYERS = "MSTBackpackPlayers";
 	protected static final @NotNull String TABLE_PROFILES = "MSTBackpackProfiles";
 	protected static final @NotNull String COLUMN_PLAYER_ID = "PlayerUUID";
@@ -37,7 +36,7 @@ public abstract class BackpackDatabase extends Database {
 	private final @NotNull String statementSaveExtrasProfile;
 
 	protected BackpackDatabase(@NotNull MSTBackpack plugin, @NotNull String url, @Nullable String username, @Nullable String password) throws ClassNotFoundException {
-		super(url, POOL_NAME, username, password);
+		super(url, "MSTBackpack", username, password);
 		this.plugin = plugin;
 		this.statementSaveItems = new InsertBuilder(TABLE_PROFILES).columns(COLUMN_PLAYER_ID, COLUMN_PROFILE_ID, COLUMN_ITEMS).
 				conflictUpdate(COLUMN_ITEMS + "=" + fromConflict(COLUMN_ITEMS), COLUMN_PLAYER_ID, COLUMN_PROFILE_ID).build();
@@ -134,7 +133,7 @@ public abstract class BackpackDatabase extends Database {
 	@NotNull
 	public final CompletableFuture<Void> updateExtrasAsync(@NotNull UUID playerID, @Nullable UUID profileID, int delta) {
 		if (delta == 0) return CompletableFuture.completedFuture(null);
-		int maxPlayer = this.plugin.config().amountExtraPlayerMax(), maxProfile = this.plugin.config().amountExtraProfileMax();
+		int maxPlayer = this.plugin.backpackConfig().amountExtraPlayerMax(), maxProfile = this.plugin.backpackConfig().amountExtraProfileMax();
 		return CompletableFuture.runAsync(() -> {
 			try (Connection connection = getConnection()) {
 				if (profileID == null) {
@@ -173,6 +172,6 @@ public abstract class BackpackDatabase extends Database {
 			} catch (SQLException e) {
 				throw new CompletionException(e);
 			}
-		});
+		}, ExecutorManager.instance().database);
 	}
 }
