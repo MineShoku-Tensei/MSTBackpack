@@ -47,27 +47,35 @@ public class BackpackDatabaseTest {
 	@Test
 	void updateExtras() throws ExecutionException, InterruptedException {
 		PlayerMock player = TestUtils.addPlayer(this.server, this.profileProvider);
-		BackpackUtils.getExtras(player.getUniqueId(), null).thenAccept(info -> assertEquals(Pair.of(0, 0), info)).get();
+		UUID playerID = player.getUniqueId();
+		BackpackUtils.getExtras(playerID, null).thenAccept(info -> assertEquals(Pair.of(0, 0), info)).get();
 		TestUtils.addProfiles(this.profileProvider, player, 1);
-		UUID profileID = this.profileProvider.getPlayerData(player.getUniqueId()).setCurrentProfileIfNotSet().getUniqueId();
-		BackpackUtils.updateExtrasPlayer(player.getUniqueId(), 4).
-				thenCompose(v -> BackpackUtils.updateExtrasProfile(player.getUniqueId(), profileID, 2)).
-				thenCompose(v -> BackpackUtils.getExtras(player.getUniqueId(), profileID)).
+		UUID profileID = this.profileProvider.getPlayerData(playerID).setCurrentProfileIfNotSet().getUniqueId();
+		BackpackUtils.updateExtrasPlayer(playerID, 4).
+				thenCompose(v -> BackpackUtils.updateExtrasProfile(playerID, profileID, 2)).
+				thenCompose(v -> BackpackUtils.getExtras(playerID, profileID)).
 				thenAccept(info -> assertEquals(Pair.of(4, 2), info)).get();
 	}
 
 	@Test
 	void updateItems() throws ExecutionException, InterruptedException {
 		PlayerMock player = TestUtils.addPlayer(this.server, this.profileProvider);
+		UUID playerID = player.getUniqueId();
 		TestUtils.addProfiles(this.profileProvider, player, 1);
-		UUID profileID = this.profileProvider.getPlayerData(player.getUniqueId()).setCurrentProfileIfNotSet().getUniqueId();
-		BackpackUtils.getItems(player.getUniqueId(), profileID).thenAccept(Assertions::assertNull).get();
-		List<ItemStack> items1 = Arrays.asList(ItemStack.of(Material.DIRT), null, null, ItemStack.of(Material.STONE), null, null, ItemStack.of(Material.DIRT)),
-				items2 = new BackpackInfo(player.getUniqueId(), profileID, 0, 0, InventoryUtils.condenseItems(items1)).items();
-		BackpackUtils.saveItems(player.getUniqueId(), profileID, items1).
-				thenCompose(v -> BackpackUtils.getItems(player.getUniqueId(), profileID)).
+		UUID profileID = this.profileProvider.getPlayerData(playerID).setCurrentProfileIfNotSet().getUniqueId();
+		BackpackUtils.getItems(playerID, profileID).thenAccept(Assertions::assertNull).get();
+		ItemStack dirt = ItemStack.of(Material.DIRT), stone = ItemStack.of(Material.STONE);
+		List<ItemStack> items1 = Arrays.asList(dirt, null, null, stone, null, null, dirt),
+				items2 = Arrays.asList(dirt, dirt, stone, stone, dirt, dirt, stone, stone);
+		BackpackUtils.saveItems(playerID, profileID, items1).
+				thenCompose(v -> BackpackUtils.getItems(playerID, profileID)).
 				thenApply(items -> items == null ? null : InventoryUtils.condenseItems(items)).
-				thenApply(items -> new BackpackInfo(player.getUniqueId(), profileID, 0, 0, items).items()).
-				thenAccept(items -> TestUtils.assertSameValues(items2, items)).get();
+				thenApply(items -> new BackpackInfo(playerID, profileID, items).items()).
+				thenAccept(items -> TestUtils.assertSameValues(InventoryUtils.condenseItems(items1), items)).get();
+		BackpackUtils.saveItems(playerID, profileID, items2).
+				thenCompose(v -> BackpackUtils.getItems(playerID, profileID)).
+				thenApply(items -> items == null ? null : InventoryUtils.condenseItems(items)).
+				thenApply(items -> new BackpackInfo(playerID, profileID, items).items()).
+				thenAccept(items -> TestUtils.assertSameValues(InventoryUtils.condenseItems(items2), items)).get();
 	}
 }

@@ -4,7 +4,12 @@ import com.mineshoku.mstutils.Utils;
 import com.mineshoku.mstutils.tests.TestUtils;
 import com.mineshoku.mstutils.tests.mock.MMOPlayerProfile;
 import com.mineshoku.mstutils.tests.mock.MMOProfileProvider;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TextComponent;
+import org.bukkit.Material;
+import org.bukkit.command.CommandSender;
 import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.permissions.PermissionAttachment;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
@@ -47,24 +52,40 @@ public class BackpackCommandTest {
 		TestUtils.testPluginLoadsSuccessfully(this.plugin);
 	}
 
+	@NotNull
+	List<String> tabComplete(@NotNull CommandSender sender, @NotNull String cmd) {
+		return this.server.getCommandTabComplete(sender, cmd);
+	}
+
+	void testStreamBase(int expected, @NotNull CommandSender sender) {
+		BackpackCommandHandler.BASE.stream().map(str -> str.charAt(0)).forEach(c -> assertSame(expected,
+				tabComplete(sender, TestUtils.cmd(COMMAND, false, c)).size()));
+	}
+
+	@NotNull
+	CommandSender console() {
+		return this.server.getConsoleSender();
+	}
+
 	@Test
 	void tabCompleteBase() {
-		TestUtils.assertSameValues(BackpackCommandHandler.BASE, this.server.getCommandTabComplete(this.server.getConsoleSender(), TestUtils.cmd(COMMAND, true)));
-		BackpackCommandHandler.BASE.stream().map(str -> str.charAt(0)).forEach(c -> assertSame(1, this.server.getCommandTabComplete(this.server.getConsoleSender(), TestUtils.cmd(COMMAND, false, c)).size()));
-		PlayerMock player1 = TestUtils.addPlayer(this.server, this.profileProvider), player2 = TestUtils.addPlayer(this.server, this.profileProvider);
+		TestUtils.assertSameValues(BackpackCommandHandler.BASE, tabComplete(console(), TestUtils.cmd(COMMAND, true)));
+		testStreamBase(1, console());
+		PlayerMock player1 = TestUtils.addPlayer(this.server, this.profileProvider),
+				player2 = TestUtils.addPlayer(this.server, this.profileProvider);
 		PermissionAttachment attachment = player1.addAttachment(this.plugin);
 		attachment.setPermission(BackpackCommandHandler.PERMISSION_ADVANCED, true);
-		TestUtils.assertSameValues(BackpackCommandHandler.BASE, this.server.getCommandTabComplete(player1, TestUtils.cmd(COMMAND, true)));
-		TestUtils.assertSameValues(Collections.emptyList(), this.server.getCommandTabComplete(player2, TestUtils.cmd(COMMAND, true)));
-		BackpackCommandHandler.BASE.stream().map(str -> str.charAt(0)).forEach(c -> assertSame(1, this.server.getCommandTabComplete(player1, TestUtils.cmd(COMMAND, false, c)).size()));
-		BackpackCommandHandler.BASE.stream().map(str -> str.charAt(0)).forEach(c -> assertSame(0, this.server.getCommandTabComplete(player2, TestUtils.cmd(COMMAND, false, c)).size()));
+		TestUtils.assertSameValues(BackpackCommandHandler.BASE, tabComplete(player1, TestUtils.cmd(COMMAND, true)));
+		TestUtils.assertSameValues(Collections.emptyList(), tabComplete(player2, TestUtils.cmd(COMMAND, true)));
+		testStreamBase(1, player1);
+		testStreamBase(0, player2);
 	}
 
 	void tabCompleteSubSimpleCheck(@NotNull String sub) {
 		PlayerMock player1 = TestUtils.addPlayer(this.server, this.profileProvider);
 		PermissionAttachment attachment = player1.addAttachment(this.plugin);
 		attachment.setPermission(BackpackCommandHandler.PERMISSION_ADVANCED, true);
-		assertSame(0, this.server.getCommandTabComplete(player1, TestUtils.cmd(COMMAND, true, sub)).size());
+		assertSame(0, tabComplete(player1, TestUtils.cmd(COMMAND, true, sub)).size());
 	}
 
 	@Test
@@ -77,24 +98,31 @@ public class BackpackCommandTest {
 		tabCompleteSubSimpleCheck("reload");
 	}
 
-	void tabCompleteSubAdvancedCheck(@NotNull String sub, boolean hasOptionNoProfile) {
-		PlayerMock player1 = TestUtils.addPlayer(this.server, this.profileProvider), player2 = TestUtils.addPlayer(this.server, this.profileProvider);
+	void testSubAdvanced(@NotNull List<@NotNull String> list, @NotNull PlayerMock player,
+						 @NotNull String sub, @NotNull Object arg) {
+		TestUtils.assertSameValues(list, tabComplete(player, TestUtils.cmd(COMMAND, true, sub, arg)));
+	}
+
+	void tabCompleteSubAdvancedCheck(@NotNull String sub, boolean hasNoProfile) {
+		PlayerMock player1 = TestUtils.addPlayer(this.server, this.profileProvider),
+				player2 = TestUtils.addPlayer(this.server, this.profileProvider);
 		PermissionAttachment attachment = player1.addAttachment(this.plugin);
 		attachment.setPermission(BackpackCommandHandler.PERMISSION_ADVANCED, true);
 		TestUtils.disconnect(player2, this.profileProvider);
-		TestUtils.assertSameValues(List.of(BackpackCommandHandler.CURRENT, player1.getName()), this.server.getCommandTabComplete(player1, TestUtils.cmd(COMMAND, true, sub)));
-		int profiles = 4;
-		TestUtils.addProfiles(this.profileProvider, player1, profiles);
-		List<String> result = this.profileProvider.getPlayerData(player1.getUniqueId()).getProfiles().stream().map(MMOPlayerProfile::getUniqueId).map(UUID::toString).collect(Collectors.toList()),
-				setPlayer = hasOptionNoProfile ? List.of(BackpackCommandHandler.EXTRAS_SET_PLAYER) : Collections.emptyList();
+		TestUtils.assertSameValues(List.of(BackpackCommandHandler.CURRENT, player1.getName()),
+				tabComplete(player1, TestUtils.cmd(COMMAND, true, sub)));
+		TestUtils.addProfiles(this.profileProvider, player1, 4);
+		List<String> result = this.profileProvider.getPlayerData(player1.getUniqueId()).getProfiles().stream().
+				map(MMOPlayerProfile::getUniqueId).map(UUID::toString).collect(Collectors.toList()),
+				setPlayer = hasNoProfile ? List.of(BackpackCommandHandler.EXTRAS_SET_PLAYER) : Collections.emptyList();
 		result.add(BackpackCommandHandler.CURRENT);
-		if (hasOptionNoProfile) {
+		if (hasNoProfile) {
 			result.add(BackpackCommandHandler.EXTRAS_SET_PLAYER);
 		}
-		TestUtils.assertSameValues(result, this.server.getCommandTabComplete(player1, TestUtils.cmd(COMMAND, true, sub, BackpackCommandHandler.CURRENT)));
-		TestUtils.assertSameValues(setPlayer, this.server.getCommandTabComplete(player1, TestUtils.cmd(COMMAND, true, sub, player2.getName())));
-		TestUtils.assertSameValues(setPlayer, this.server.getCommandTabComplete(player1, TestUtils.cmd(COMMAND, true, sub, player2.getUniqueId())));
-		assertSame(0, this.server.getCommandTabComplete(player1, TestUtils.cmd(COMMAND, true, sub, "aaaa")).size());
+		testSubAdvanced(result, player1, sub, BackpackCommandHandler.CURRENT);
+		testSubAdvanced(setPlayer, player1, sub, player2.getName());
+		testSubAdvanced(setPlayer, player1, sub, player2.getUniqueId());
+		assertSame(0, tabComplete(player1, TestUtils.cmd(COMMAND, true, sub, "aaaa")).size());
 	}
 
 	@Test
@@ -125,7 +153,8 @@ public class BackpackCommandTest {
 
 	@Test
 	void commandRunBase() throws InterruptedException {
-		PlayerMock player1 = TestUtils.addPlayer(this.server, this.profileProvider), player2 = TestUtils.addPlayer(this.server, this.profileProvider);
+		PlayerMock player1 = TestUtils.addPlayer(this.server, this.profileProvider),
+				player2 = TestUtils.addPlayer(this.server, this.profileProvider);
 		PermissionAttachment attachment = player1.addAttachment(this.plugin);
 		attachment.setPermission(PERMISSION, true);
 		TestUtils.addProfiles(this.profileProvider, player1, 2);
@@ -141,14 +170,26 @@ public class BackpackCommandTest {
 	void commandRunOpen() throws InterruptedException {
 		PlayerMock player1 = TestUtils.addPlayer(this.server, this.profileProvider);
 		PermissionAttachment attachment = player1.addAttachment(this.plugin);
-		assertTrue(player1.performCommand(TestUtils.cmd(COMMAND, false, "open", BackpackCommandHandler.CURRENT, BackpackCommandHandler.CURRENT)));
+		assertTrue(player1.performCommand(TestUtils.cmd(COMMAND, false, "open",
+				BackpackCommandHandler.CURRENT, BackpackCommandHandler.CURRENT)));
 		assertSame(InventoryType.CRAFTING, player1.getOpenInventory().getType());
 		attachment.setPermission(BackpackCommandHandler.PERMISSION_ADVANCED, true);
-		performCommandWithAsync(player1, TestUtils.cmd(COMMAND, false, "open", BackpackCommandHandler.CURRENT, BackpackCommandHandler.CURRENT));
+		performCommandWithAsync(player1, TestUtils.cmd(COMMAND, false, "open",
+				BackpackCommandHandler.CURRENT, BackpackCommandHandler.CURRENT));
 		assertSame(InventoryType.CRAFTING, player1.getOpenInventory().getType());
 		TestUtils.addProfiles(this.profileProvider, player1, 1);
 		this.profileProvider.getPlayerData(player1.getUniqueId()).setCurrentProfileIfNotSet();
-		performCommandWithAsync(player1, TestUtils.cmd(COMMAND, false, "open", BackpackCommandHandler.CURRENT, BackpackCommandHandler.CURRENT));
+		performCommandWithAsync(player1, TestUtils.cmd(COMMAND, false, "open",
+				BackpackCommandHandler.CURRENT, BackpackCommandHandler.CURRENT));
 		assertSame(InventoryType.CHEST, player1.getOpenInventory().getType());
+	}
+
+	@Test
+	void pageItem() {
+		ItemStack item = new PageItem(Material.DIRT, "<page-2><page-1><page><page+1><page+2>", null, null, null, 0).
+				toItemStack(4, 10, 0, 0, 0, 0);
+		Component name = item.getItemMeta().itemName();
+		assertInstanceOf(TextComponent.class, name);
+		assertEquals("23456", ((TextComponent) name).content());
 	}
 }
