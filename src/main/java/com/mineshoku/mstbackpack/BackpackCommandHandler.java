@@ -18,7 +18,8 @@ import java.util.concurrent.CompletionException;
 import java.util.stream.Stream;
 
 public final class BackpackCommandHandler implements CommandExecutor, TabCompleter {
-	public static final @NotNull @Unmodifiable List<@NotNull String> BASE = List.of("help", "reload", "open", "clear", "upgrade", "downgrade");
+	public static final @NotNull @Unmodifiable List<@NotNull String>
+			BASE = List.of("help", "reload", "open", "clear", "upgrade", "downgrade");
 	public static final @NotNull String PERMISSION_ADVANCED = "mst.backpack.advanced";
 	public static final @NotNull String EXTRAS_SET_PLAYER = "-";
 	public static final @NotNull String CURRENT = ".";
@@ -39,7 +40,7 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 	private final @NotNull Map<@NotNull String, @NotNull ClearInfo> timesOthers = new HashMap<>();
 
 	public BackpackCommandHandler(@NotNull MSTBackpack plugin) {
-		if (plugin.backpackCommandHandler() != null) throw new IllegalStateException("DatabaseManager already initialized");
+		if (plugin.backpackCommandHandler() != null) throw new IllegalStateException("Command already initialized");
 		this.plugin = plugin;
 		this.command = Objects.requireNonNull(plugin.getCommand("backpack"));
 		this.command.setExecutor(this);
@@ -47,7 +48,8 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 	}
 
 	@Override
-	public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String @NotNull [] args) {
+	public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
+							 @NotNull String label, String @NotNull [] args) {
 		boolean advanced = sender.hasPermission(PERMISSION_ADVANCED);
 		UUID playerID, profileID;
 		Player player;
@@ -98,7 +100,8 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 					long now = System.currentTimeMillis();
 					long clearTimeout = this.plugin.backpackConfig().clearTimeout();
 					if (clearTimeout != 0) {
-						ClearInfo info = (sender instanceof Player p) ? this.timesPlayers.remove(p.getUniqueId()) : this.timesOthers.remove(sender.getName());
+						ClearInfo info = (sender instanceof Player p) ? this.timesPlayers.remove(p.getUniqueId()) :
+								this.timesOthers.remove(sender.getName());
 						if (info == null || (now - info.time() > this.plugin.backpackConfig().clearTimeout())) {
 							info = new ClearInfo(playerID, profileID, now);
 							if (sender instanceof Player p) {
@@ -108,7 +111,7 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 							}
 							Utils.sendMessage(sender, this.plugin.backpackConfig().messageClearResend(offlinePlayer, profileID));
 						} else {
-							this.plugin.backpackDatabase().saveItems(new BackpackInfo(playerID, profileID, 0, 0)).
+							this.plugin.backpackDatabase().saveItems(new BackpackInfo(playerID, profileID)).
 									whenComplete((ignored, e) -> {
 										Component msg;
 										if (e == null) {
@@ -133,7 +136,7 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 					}
 					amount = Math.abs(amount);
 					int delta = idx == INDEX_DOWNGRADE ? Math.negateExact(amount) : amount;
-					this.plugin.backpackDatabase().updateExtrasAsync(playerID, profileID, delta).
+					this.plugin.backpackDatabase().updateExtras(playerID, profileID, delta).
 							thenCompose(v -> this.plugin.backpackDatabase().getExtras(playerID, profileID)).
 							whenComplete((extras, e) -> {
 								if (e == null) {

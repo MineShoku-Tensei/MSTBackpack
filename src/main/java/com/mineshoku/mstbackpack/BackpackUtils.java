@@ -14,28 +14,32 @@ public class BackpackUtils {
 	private BackpackUtils() {}
 
 	@NotNull
-	public static CompletableFuture<@Nullable List<@Nullable ItemStack>> getItems(@NotNull UUID playerID, @NotNull UUID profileID) {
-		return MSTBackpack.instance().backpackDatabase().getInfo(playerID, profileID).thenApply(BackpackInfo::items);
+	public static CompletableFuture<@Nullable List<@Nullable ItemStack>> getItems(@NotNull UUID playerID,
+																				  @NotNull UUID profileID) {
+		return MSTBackpack.instance().backpackDatabase().getInfo(playerID, profileID).
+				thenApply(BackpackInfo::items);
 	}
 
 	@NotNull
-	public static CompletableFuture<Void> saveItems(@NotNull UUID playerID, @NotNull UUID profileID, @Nullable List<@Nullable ItemStack> items) {
-		return MSTBackpack.instance().backpackDatabase().saveItems(new BackpackInfo(playerID, profileID, 0, 0, items));
+	public static CompletableFuture<Void> saveItems(@NotNull UUID playerID, @NotNull UUID profileID,
+													@Nullable List<@Nullable ItemStack> items) {
+		return MSTBackpack.instance().backpackDatabase().saveItems(new BackpackInfo(playerID, profileID, items));
 	}
 
 	@NotNull
-	private static CompletableFuture<Void> updateExtrasAsync(@NotNull UUID playerID, @Nullable UUID profileID, int delta) {
-		return MSTBackpack.instance().backpackDatabase().updateExtrasAsync(playerID, profileID, delta);
+	private static CompletableFuture<Void> updateExtras(@NotNull UUID playerID, @Nullable UUID profileID, int delta) {
+		return MSTBackpack.instance().backpackDatabase().updateExtras(playerID, profileID, delta);
 	}
 
 	@NotNull
 	public static CompletableFuture<Void> updateExtrasPlayer(@NotNull UUID playerID, int delta) {
-		return updateExtrasAsync(playerID, null, delta);
+		return updateExtras(playerID, null, delta);
 	}
 
 	@NotNull
-	public static CompletableFuture<Void> updateExtrasProfile(@NotNull UUID playerID, @NotNull UUID profileID, int delta) {
-		return updateExtrasAsync(playerID, profileID, delta);
+	public static CompletableFuture<Void> updateExtrasProfile(@NotNull UUID playerID,
+															  @NotNull UUID profileID, int delta) {
+		return updateExtras(playerID, profileID, delta);
 	}
 
 	@NotNull

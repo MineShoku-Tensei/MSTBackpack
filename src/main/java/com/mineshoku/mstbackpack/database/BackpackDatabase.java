@@ -12,6 +12,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.sql.*;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -24,28 +25,35 @@ public abstract class BackpackDatabase extends Database {
 	protected static final @NotNull String COLUMN_ITEMS = "Items";
 	protected static final @NotNull String COLUMN_EXTRAS = "Extras";
 	private static final byte @NotNull [] NULL_ITEMS_BYTES = ItemStack.serializeItemsAsBytes(Collections.emptyList());
-	private static final @NotNull String STATEMENT_GET_EXTRAS_PLAYER = new SelectBuilder(TABLE_PLAYERS).columns(COLUMN_EXTRAS).where(COLUMN_PLAYER_ID).build();
-	private static final @NotNull String STATEMENT_GET_EXTRAS_PROFILE = new SelectBuilder(TABLE_PROFILES).columns(COLUMN_EXTRAS).
-			where(COLUMN_PLAYER_ID, COLUMN_PROFILE_ID).build();
-	private static final @NotNull String STATEMENT_GET_INFO = new SelectBuilder(TABLE_PROFILES).columns(COLUMN_ITEMS, COLUMN_EXTRAS).
-			where(COLUMN_PLAYER_ID, COLUMN_PROFILE_ID).build();
+	private static final @NotNull String STATEMENT_GET_EXTRAS_PLAYER = new SelectBuilder(TABLE_PLAYERS).
+			columns(COLUMN_EXTRAS).where(COLUMN_PLAYER_ID).build();
+	private static final @NotNull String STATEMENT_GET_EXTRAS_PROFILE = new SelectBuilder(TABLE_PROFILES).
+			columns(COLUMN_EXTRAS).where(COLUMN_PLAYER_ID, COLUMN_PROFILE_ID).build();
+	private static final @NotNull String STATEMENT_GET_INFO = new SelectBuilder(TABLE_PROFILES).
+			columns(COLUMN_ITEMS, COLUMN_EXTRAS).where(COLUMN_PLAYER_ID, COLUMN_PROFILE_ID).build();
 
 	protected final @NotNull MSTBackpack plugin;
 	private final @NotNull String statementSaveItems;
 	private final @NotNull String statementSaveExtrasPlayer;
 	private final @NotNull String statementSaveExtrasProfile;
 
-	protected BackpackDatabase(@NotNull MSTBackpack plugin, @NotNull String url, @Nullable String username, @Nullable String password) throws ClassNotFoundException {
+	protected BackpackDatabase(@NotNull MSTBackpack plugin, @NotNull String url,
+							   @Nullable String username, @Nullable String password) throws ClassNotFoundException {
 		super(url, "MSTBackpack", username, password);
 		this.plugin = plugin;
-		this.statementSaveItems = new InsertBuilder(TABLE_PROFILES).columns(COLUMN_PLAYER_ID, COLUMN_PROFILE_ID, COLUMN_ITEMS).
-				conflictUpdate(COLUMN_ITEMS + "=" + fromConflict(COLUMN_ITEMS), COLUMN_PLAYER_ID, COLUMN_PROFILE_ID).build();
+		this.statementSaveItems = new InsertBuilder(TABLE_PROFILES).
+				columns(COLUMN_PLAYER_ID, COLUMN_PROFILE_ID, COLUMN_ITEMS).
+				conflictUpdate(COLUMN_ITEMS + "=" + fromConflict(COLUMN_ITEMS), COLUMN_PLAYER_ID, COLUMN_PROFILE_ID).
+				build();
 		String prefix = COLUMN_EXTRAS + "=" + functionMin() + "(" + functionMax() + "(",
 				suffix = "." + COLUMN_EXTRAS + " + " + fromConflict(COLUMN_EXTRAS) + ", ?), ?)";
 		this.statementSaveExtrasPlayer = new InsertBuilder(TABLE_PLAYERS).columns(COLUMN_PLAYER_ID, COLUMN_EXTRAS).
-				conflictUpdate(prefix + TABLE_PLAYERS + suffix, COLUMN_PLAYER_ID).build();
-		this.statementSaveExtrasProfile = new InsertBuilder(TABLE_PROFILES).columns(COLUMN_PLAYER_ID, COLUMN_PROFILE_ID, COLUMN_ITEMS, COLUMN_EXTRAS).
-				conflictUpdate(prefix + TABLE_PROFILES + suffix, COLUMN_PLAYER_ID, COLUMN_PROFILE_ID).build();
+				conflictUpdate(prefix + TABLE_PLAYERS + suffix, COLUMN_PLAYER_ID).
+				build();
+		this.statementSaveExtrasProfile = new InsertBuilder(TABLE_PROFILES).
+				columns(COLUMN_PLAYER_ID, COLUMN_PROFILE_ID, COLUMN_ITEMS, COLUMN_EXTRAS).
+				conflictUpdate(prefix + TABLE_PROFILES + suffix, COLUMN_PLAYER_ID, COLUMN_PROFILE_ID).
+				build();
 	}
 
 	protected final void prepareDatabase() throws SQLException {
@@ -77,7 +85,8 @@ public abstract class BackpackDatabase extends Database {
 	}
 
 	@NonNegative
-	private int getExtrasProfile(@NotNull Connection connection, @NotNull UUID playerID, @NotNull UUID profileID) throws SQLException {
+	private int getExtrasProfile(@NotNull Connection connection,
+								 @NotNull UUID playerID, @NotNull UUID profileID) throws SQLException {
 		try (PreparedStatement statement = connection.prepareStatement(STATEMENT_GET_EXTRAS_PROFILE)) {
 			statement.setString(1, playerID.toString());
 			statement.setString(2, profileID.toString());
@@ -121,7 +130,8 @@ public abstract class BackpackDatabase extends Database {
 				try (PreparedStatement statement = connection.prepareStatement(this.statementSaveItems)) {
 					statement.setString(1, info.playerID().toString());
 					statement.setString(2, info.profileID().toString());
-					statement.setBytes(3, info.items() == null ? NULL_ITEMS_BYTES : ItemStack.serializeItemsAsBytes(info.items()));
+					List<ItemStack> items = info.items();
+					statement.setBytes(3, items == null ? NULL_ITEMS_BYTES : ItemStack.serializeItemsAsBytes(items));
 					statement.executeUpdate();
 				}
 			} catch (SQLException e) {
@@ -131,9 +141,10 @@ public abstract class BackpackDatabase extends Database {
 	}
 
 	@NotNull
-	public final CompletableFuture<Void> updateExtrasAsync(@NotNull UUID playerID, @Nullable UUID profileID, int delta) {
+	public final CompletableFuture<Void> updateExtras(@NotNull UUID playerID, @Nullable UUID profileID, int delta) {
 		if (delta == 0) return CompletableFuture.completedFuture(null);
-		int maxPlayer = this.plugin.backpackConfig().amountExtraPlayerMax(), maxProfile = this.plugin.backpackConfig().amountExtraProfileMax();
+		int maxPlayer = this.plugin.backpackConfig().amountExtraPlayerMax(),
+				maxProfile = this.plugin.backpackConfig().amountExtraProfileMax();
 		return CompletableFuture.runAsync(() -> {
 			try (Connection connection = getConnection()) {
 				if (profileID == null) {

@@ -3,6 +3,7 @@ package com.mineshoku.mstbackpack;
 import com.mineshoku.mstbackpack.database.BackpackDatabase;
 import com.mineshoku.mstbackpack.database.BackpackLocalDB;
 import com.mineshoku.mstbackpack.database.BackpackMySQL;
+import com.mineshoku.mstutils.TextUtils;
 import com.mineshoku.mstutils.Utils;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -26,7 +27,7 @@ public class MSTBackpack extends JavaPlugin {
 		this.backpackConfig = new BackpackConfig(this);
 		try {
 			String host = this.backpackConfig.host();
-			if (host == null || host.isBlank()) {
+			if (TextUtils.isNullOrBlank(host)) {
 				this.backpackDatabase = new BackpackLocalDB(this);
 			} else {
 				try {

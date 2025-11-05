@@ -1,7 +1,6 @@
 package com.mineshoku.mstbackpack;
 
 import com.mineshoku.mstutils.InventoryUtils;
-import com.mineshoku.mstutils.TextUtils;
 import com.mineshoku.mstutils.Utils;
 import com.mineshoku.mstutils.managers.ExecutorManager;
 import org.bukkit.Bukkit;
@@ -40,32 +39,38 @@ public class BackpackMenu implements Listener {
 	private final @Positive int inventorySize;
 	protected final @Positive int maxPages;
 	private final @NotNull Inventory inventory;
-	protected final @NotNull TreeMap<@NotNull Integer, @NotNull TreeMap<@NotNull Integer, @Nullable ItemStack>> pagesContent;
+	protected final @NotNull TreeMap<@NotNull Integer,
+			@NotNull TreeMap<@NotNull Integer, @Nullable ItemStack>> pagesItems;
 	private final @NotNull @Unmodifiable Set<@NotNull Integer> staticBorders;
-	private final @NotNull @Unmodifiable NavigableMap<@NotNull Integer, @NotNull @Unmodifiable NavigableMap<@NotNull Integer, @NotNull Boolean>> extraBorders;
+	private final @NotNull @Unmodifiable NavigableMap<@NotNull Integer,
+			@NotNull @Unmodifiable NavigableMap<@NotNull Integer, @NotNull Boolean>> extraBorders;
 	private final @Nullable ItemStack @NotNull [] playerInitialItems;
 	private @Positive int currentPage;
-	private @Nullable TreeMap<@NotNull Integer, @Nullable ItemStack> pageContent;
+	private @Nullable TreeMap<@NotNull Integer, @Nullable ItemStack> pageItems;
 	private @Nullable @Unmodifiable NavigableMap<@NotNull Integer, @NotNull Boolean> extraBorder;
 
-	public BackpackMenu(@NotNull MSTBackpack plugin, @NotNull Player player, @NotNull BackpackInfo info) throws NullPointerException {
+	public BackpackMenu(@NotNull MSTBackpack plugin, @NotNull Player player,
+						@NotNull BackpackInfo info) throws NullPointerException {
 		this.plugin = plugin;
 		this.player = player;
 		this.info = info;
 		this.type = this.plugin.backpackConfig().type();
 		this.topBorder = this.plugin.backpackConfig().menuBorder();
 		boolean menuShowUnlockable = this.plugin.backpackConfig().menuShowUnlockable();
-		int totalSlots = totalSlots(this.plugin.backpackConfig().calculateAmount(info.extrasPlayer(), info.extrasProfile()), this.type, this.topBorder),
-				totalSlotsPossibleWithExtras = totalSlots(this.plugin.backpackConfig().amountTotalMax(), this.type, this.topBorder),
-				maxSlotsPerPage = InventoryUtils.slotsFromLines(InventoryUtils.INVENTORY_MAX_LINES - (this.topBorder ? 2 : 1));
-		this.pagesContent = itemsPages(this.info.items(), this.topBorder, maxSlotsPerPage, this.plugin.backpackConfig().condense());
-		this.maxPages = maxPages(totalSlots, totalSlotsPossibleWithExtras, menuShowUnlockable, maxSlotsPerPage);
+		int amount = this.plugin.backpackConfig().calculateAmount(info.extrasPlayer(), info.extrasProfile()),
+				borders = this.topBorder ? 2 : 1,
+				totalSlots = totalSlots(amount, this.type, this.topBorder),
+				totalSlotsMax = totalSlots(this.plugin.backpackConfig().amountTotalMax(), this.type, this.topBorder),
+				maxSlotsPerPage = InventoryUtils.slotsFromLines(InventoryUtils.INVENTORY_MAX_LINES - borders);
+		this.pagesItems = itemsPages(this.info.items(), this.topBorder, maxSlotsPerPage,
+				this.plugin.backpackConfig().condense());
+		this.maxPages = maxPages(totalSlots, totalSlotsMax, menuShowUnlockable, maxSlotsPerPage);
 		int lines = menuShowUnlockable || this.maxPages > 1 ? InventoryUtils.INVENTORY_MAX_LINES :
-				Math.ceilDiv(totalSlots, InventoryUtils.LINE_SLOTS) + (this.topBorder ? 2 : 1);
+				Math.ceilDiv(totalSlots, InventoryUtils.LINE_SLOTS) + borders;
 		this.inventory = InventoryUtils.inventory(this.player, lines, this.plugin.backpackConfig().menuTitle());
 		this.inventorySize = this.inventory.getSize();
 		this.extraBorders = extraBorders(this.topBorder, this.inventorySize, this.maxPages,
-				totalSlots, totalSlotsPossibleWithExtras, maxSlotsPerPage);
+				totalSlots, totalSlotsMax, maxSlotsPerPage);
 		this.staticBorders = staticBorders(this.topBorder, this.inventorySize);
 		this.playerInitialItems = this.player.getInventory().getContents();
 		setPage(1, false);
@@ -74,7 +79,8 @@ public class BackpackMenu implements Listener {
 	@NonNegative
 	private static int totalSlots(@NonNegative int total, BackpackConfig.@NotNull Type type, boolean topBorder) {
 		return switch (type) {
-			case PAGES -> Math.multiplyExact(total, InventoryUtils.slotsFromLines(InventoryUtils.INVENTORY_MAX_LINES - (topBorder ? 2 : 1)));
+			case PAGES -> Math.multiplyExact(total,
+					InventoryUtils.slotsFromLines(InventoryUtils.INVENTORY_MAX_LINES - (topBorder ? 2 : 1)));
 			case LINES -> Math.multiplyExact(total, InventoryUtils.LINE_SLOTS);
 			case SLOTS -> total;
 		};
@@ -99,7 +105,8 @@ public class BackpackMenu implements Listener {
 	@NotNull
 	@Contract("_, _, _, _ -> new")
 	private static TreeMap<@NotNull Integer, @NotNull TreeMap<@NotNull Integer, @Nullable ItemStack>>
-	itemsPages(@Nullable List<@Nullable ItemStack> items, boolean topBorder, @Positive int maxSlotsPerPage, boolean condense) {
+	itemsPages(@Nullable List<@Nullable ItemStack> items, boolean topBorder,
+			   @Positive int maxSlotsPerPage, boolean condense) {
 		TreeMap<Integer, TreeMap<Integer, ItemStack>> map = new TreeMap<>();
 		if (items == null || items.isEmpty()) return map;
 		if (condense) {
@@ -116,7 +123,8 @@ public class BackpackMenu implements Listener {
 		return map;
 	}
 
-	private static int maxPages(int totalSlots, int totalSlotsMax, boolean menuShowUnlockable, @Positive int maxSlotsPerPage) {
+	private static int maxPages(int totalSlots, int totalSlotsMax,
+								boolean menuShowUnlockable, @Positive int maxSlotsPerPage) {
 		int useSlots = menuShowUnlockable ? totalSlotsMax : totalSlots;
 		return useSlots < maxSlotsPerPage ? 1 : Math.ceilDiv(useSlots, maxSlotsPerPage);
 	}
@@ -139,35 +147,27 @@ public class BackpackMenu implements Listener {
 		return Collections.unmodifiableNavigableMap(clone);
 	}
 
-	@NotNull
-	@Contract("_ -> new")
-	protected final ItemStack lockItem(@NotNull ItemStack item) {
-		ItemStack clone = item.clone();
-		clone.editMeta(meta -> Utils.setPDCString(meta, Utils.newNamespacedKey(this.plugin, UUID.randomUUID()), TextUtils.randomString()));
-		return clone;
-	}
-
 	@Nullable
 	private ItemStack getFromPage(@NonNegative int slot) {
-		return this.pageContent == null ? null : this.pageContent.get(slot);
+		return this.pageItems == null ? null : this.pageItems.get(slot);
 	}
 
 	private void savePage() {
-		if (this.pageContent == null) {
-			this.pageContent = new TreeMap<>();
-			this.pagesContent.put(this.currentPage, this.pageContent);
+		if (this.pageItems == null) {
+			this.pageItems = new TreeMap<>();
+			this.pagesItems.put(this.currentPage, this.pageItems);
 		}
 		runInside(slot -> {
 			ItemStack item = this.inventory.getItem(slot);
 			if (item == null) {
-				this.pageContent.remove(slot);
+				this.pageItems.remove(slot);
 			} else {
-				this.pageContent.put(slot, item);
+				this.pageItems.put(slot, item);
 			}
 		});
-		if (this.pageContent.isEmpty()) {
-			this.pageContent = null;
-			this.pagesContent.remove(this.currentPage);
+		if (this.pageItems.isEmpty()) {
+			this.pageItems = null;
+			this.pagesItems.remove(this.currentPage);
 		}
 	}
 
@@ -177,7 +177,7 @@ public class BackpackMenu implements Listener {
 			savePage();
 		}
 		this.currentPage = page;
-		this.pageContent = this.pagesContent.get(page);
+		this.pageItems = this.pagesItems.get(page);
 		this.extraBorder = this.extraBorders.get(page);
 		updateBorder();
 		fillContent();
@@ -230,13 +230,15 @@ public class BackpackMenu implements Listener {
 	}
 
 	@NotNull
-	private ItemStack fromConfigPageItem(BackpackConfig.@NotNull PageItem pageItem) {
-		return pageItem.toItemStack(this.currentPage, this.maxPages, this.info.extrasPlayer(), this.info.extrasProfile(),
-				this.plugin.backpackConfig().amountExtraPlayerMax(), this.plugin.backpackConfig().amountExtraProfileMax());
+	private ItemStack fromConfigPageItem(@NotNull PageItem pageItem) {
+		return pageItem.toItemStack(this.currentPage, this.maxPages,
+				this.info.extrasPlayer(), this.info.extrasProfile(),
+				this.plugin.backpackConfig().amountExtraPlayerMax(),
+				this.plugin.backpackConfig().amountExtraProfileMax());
 	}
 
 	@NonNegative
-	private int calculateSlot(BackpackConfig.@NotNull PageItem pageItem) {
+	private int calculateSlot(@NotNull PageItem pageItem) {
 		int calculated = pageItem.slot();
 		while (calculated < 0) {
 			calculated += this.inventorySize;
@@ -248,32 +250,38 @@ public class BackpackMenu implements Listener {
 	}
 
 	protected final void updateBorder() {
-		BackpackConfig.PageItem menuIndicator = this.plugin.backpackConfig().menuIndicator();
-		BackpackConfig.PageItem menuClose = this.plugin.backpackConfig().menuClose();
-		BackpackConfig.PageItem menuNext = this.plugin.backpackConfig().menuNext();
-		BackpackConfig.PageItem menuPrevious = this.plugin.backpackConfig().menuPrevious();
-		BackpackConfig.PageItem menuBorderStatic = this.plugin.backpackConfig().menuBorderStatic();
-		BackpackConfig.PageItem menuBorderUnlockable = this.plugin.backpackConfig().menuBorderUnlockable();
-		ItemStack borderStatic = fromConfigPageItem(menuBorderStatic), borderUnlockable = fromConfigPageItem(menuBorderUnlockable);
-		int slotClose = calculateSlot(menuClose), slotNext = calculateSlot(menuNext), slotPrevious = calculateSlot(menuPrevious), slotIndicator;
+		PageItem menuIndicator = this.plugin.backpackConfig().menuIndicator();
+		PageItem menuClose = this.plugin.backpackConfig().menuClose();
+		PageItem menuNext = this.plugin.backpackConfig().menuNext();
+		PageItem menuPrevious = this.plugin.backpackConfig().menuPrevious();
+		PageItem menuBorderStatic = this.plugin.backpackConfig().menuBorderStatic();
+		PageItem menuBorderUnlockable = this.plugin.backpackConfig().menuBorderUnlockable();
+		ItemStack borderStatic = fromConfigPageItem(menuBorderStatic),
+				borderUnlockable = fromConfigPageItem(menuBorderUnlockable);
+		int slotIndicator, slotClose = calculateSlot(menuClose),
+				slotNext = calculateSlot(menuNext),
+				slotPrevious = calculateSlot(menuPrevious);
 		this.slotClose = isLegalBorder(slotClose) ? slotClose : null;
 		this.slotNext = isLegalBorder(slotNext) ? slotNext : null;
 		this.slotPrevious = isLegalBorder(slotPrevious) ? slotPrevious : null;
-		this.staticBorders.forEach(slot -> setItem(slot, lockItem(borderStatic)));
+		this.staticBorders.forEach(slot -> setItem(slot, Utils.uniquifyItem(borderStatic)));
 		if (this.extraBorder != null) {
-			this.extraBorder.forEach((slot, unlockable) -> setItem(slot, lockItem(unlockable ? borderUnlockable : borderStatic)));
+			this.extraBorder.forEach((slot, unlockable) ->
+					setItem(slot, Utils.uniquifyItem(unlockable ? borderUnlockable : borderStatic)));
 		}
 		if (menuIndicator != null && isLegalBorder(slotIndicator = calculateSlot(menuIndicator))) {
-			setItem(slotIndicator, lockItem(fromConfigPageItem(menuIndicator)));
+			setItem(slotIndicator, Utils.uniquifyItem(fromConfigPageItem(menuIndicator)));
 		}
 		if (this.slotPrevious != null) {
-			setItem(this.slotPrevious, lockItem(this.currentPage > 1 ? fromConfigPageItem(menuPrevious) : borderStatic));
+			setItem(this.slotPrevious,
+					Utils.uniquifyItem(this.currentPage > 1 ? fromConfigPageItem(menuPrevious) : borderStatic));
 		}
 		if (this.slotNext != null) {
-			setItem(this.slotNext, lockItem(this.currentPage < this.maxPages ? fromConfigPageItem(menuNext) : borderStatic));
+			setItem(this.slotNext,
+					Utils.uniquifyItem(this.currentPage < this.maxPages ? fromConfigPageItem(menuNext) : borderStatic));
 		}
 		if (this.slotClose != null) {
-			setItem(this.slotClose, lockItem(fromConfigPageItem(menuClose)));
+			setItem(this.slotClose, Utils.uniquifyItem(fromConfigPageItem(menuClose)));
 		}
 	}
 
@@ -336,9 +344,10 @@ public class BackpackMenu implements Listener {
 	protected final void saveExit() {
 		savePage();
 		List<ItemStack> items = new ArrayList<>(), temp = new ArrayList<>();
-		int startSlot = this.topBorder ? InventoryUtils.LINE_SLOTS : 0, endSlots = this.inventorySize - InventoryUtils.LINE_SLOTS;
-		for (int page = 1; page <= (this.pagesContent.isEmpty() ? 0 : this.pagesContent.lastKey()); page++) {
-			Map<Integer, ItemStack> pageContent = this.pagesContent.get(page);
+		int startSlot = this.topBorder ? InventoryUtils.LINE_SLOTS : 0,
+				endSlots = this.inventorySize - InventoryUtils.LINE_SLOTS;
+		for (int page = 1; page <= (this.pagesItems.isEmpty() ? 0 : this.pagesItems.lastKey()); page++) {
+			Map<Integer, ItemStack> pageContent = this.pagesItems.get(page);
 			for (int slot = startSlot; slot < endSlots; slot++) {
 				ItemStack item = pageContent == null ? null : pageContent.get(slot);
 				if (item == null) {
@@ -350,7 +359,8 @@ public class BackpackMenu implements Listener {
 				}
 			}
 		}
-		BackpackInfo saveInfo = this.info.withItems(this.plugin.backpackConfig().condense() ? InventoryUtils.condenseItems(items) : items);
+		BackpackInfo saveInfo = this.info.withItems(this.plugin.backpackConfig().condense() ?
+				InventoryUtils.condenseItems(items) : items);
 		this.plugin.backpackDatabase().saveItems(saveInfo).handle((ignored, e) -> {
 			if (e == null) return true;
 			Utils.logException(this.plugin, e);
