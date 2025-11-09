@@ -55,8 +55,7 @@ public class BackpackDatabaseTest {
 		assertSame(4, profiles4.size());
 		TestUtils.waitAsync(this.server);
 		TestUtils.disconnect(player1);
-		this.plugin.backpackDatabase().getProfiles().thenCombine(this.plugin.backpackDatabase().getPlayers(),
-				(profilesMap, players) -> {
+		this.plugin.backpackDatabase().getProfiles().thenCombine(this.plugin.backpackDatabase().getPlayers(), (profilesMap, players) -> {
 			TestUtils.assertSameValues(List.of(player1.getUniqueId(), player2.getUniqueId(), player4.getUniqueId()), profilesMap.keySet());
 			TestUtils.assertSameValues(List.of(player1.getUniqueId(), player2.getUniqueId(), player3.getUniqueId(), player4.getUniqueId()), players);
 			players.forEach(playerID -> profilesMap.putIfAbsent(playerID, new LinkedHashSet<>()));

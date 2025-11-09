@@ -136,7 +136,7 @@
         <dependency>
             <groupId>com.mineshoku</groupId>
             <artifactId>mstutils</artifactId>
-            <version>1.5</version>
+            <version>1.6</version>
             <scope>provided</scope>
         </dependency>
         <dependency>

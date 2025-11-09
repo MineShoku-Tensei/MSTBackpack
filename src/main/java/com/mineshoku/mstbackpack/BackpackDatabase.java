@@ -28,9 +28,6 @@ public abstract sealed class BackpackDatabase extends Database permits BackpackD
 	private static final @NotNull String COLUMN_ITEMS = "items";
 	private static final @NotNull String COLUMN_EXTRAS = "extras";
 	private static final byte @NotNull [] NULL_ITEMS_BYTES = ItemStack.serializeItemsAsBytes(Collections.emptyList());
-	private static final @NotNull String STATEMENT_INSERT_PLAYER = new InsertBuilder(TABLE_PLAYERS).column(COLUMN_PLAYER_ID).build();
-	private static final @NotNull String STATEMENT_INSERT_PROFILE = new InsertBuilder(TABLE_PROFILES).
-			column(COLUMN_PLAYER_ID).column(COLUMN_PROFILE_ID).column(COLUMN_ITEMS).build();
 	private static final @NotNull String STATEMENT_GET_PLAYERS = new SelectBuilder(TABLE_PLAYERS).column(COLUMN_PLAYER_ID).build();
 	private static final @NotNull String STATEMENT_GET_PROFILES = new SelectBuilder(TABLE_PROFILES).column(COLUMN_PLAYER_ID).column(COLUMN_PROFILE_ID).build();
 	private static final @NotNull String STATEMENT_REMOVE_PROFILES = new DeleteBuilder(TABLE_PROFILES).where(COLUMN_PLAYER_ID).where(COLUMN_PROFILE_ID).build();
@@ -41,6 +38,8 @@ public abstract sealed class BackpackDatabase extends Database permits BackpackD
 			where(COLUMN_PLAYER_ID).where(COLUMN_PROFILE_ID).build();
 
 	private final @NotNull MSTBackpack plugin;
+	private final @NotNull String statementInsertPlayer;
+	private final @NotNull String statementInsertProfile;
 	private final @NotNull String statementSaveItems;
 	private final @NotNull String statementSaveExtrasPlayer;
 	private final @NotNull String statementSaveExtrasProfile;
@@ -55,17 +54,19 @@ public abstract sealed class BackpackDatabase extends Database permits BackpackD
 	private BackpackDatabase(@NotNull MSTBackpack plugin) throws ClassNotFoundException, SQLException {
 		super(fromUtils());
 		this.plugin = plugin;
-		this.statementSaveItems = new InsertBuilder(TABLE_PROFILES).
+		this.statementInsertPlayer = new InsertBuilder(this, TABLE_PLAYERS).column(COLUMN_PLAYER_ID).ignoreConflict(true).build();
+		this.statementInsertProfile = new InsertBuilder(this, TABLE_PROFILES).ignoreConflict(true).
+				column(COLUMN_PLAYER_ID).column(COLUMN_PROFILE_ID).column(COLUMN_ITEMS).build();
+		this.statementSaveItems = new InsertBuilder(this, TABLE_PROFILES).
 				column(COLUMN_PLAYER_ID).column(COLUMN_PROFILE_ID).column(COLUMN_ITEMS).
 				conflictUpdate(new InsertBuilder.ConflictUpdateBuilder(this, COLUMN_ITEMS + "=" + fromConflict(COLUMN_ITEMS)).
-						column(COLUMN_PLAYER_ID).column(COLUMN_PROFILE_ID)).
-				build();
+						column(COLUMN_PLAYER_ID).column(COLUMN_PROFILE_ID)).build();
 		String prefix = COLUMN_EXTRAS + "=" + functionMin() + "(" + functionMax() + "(",
 				suffix = "." + COLUMN_EXTRAS + " + " + fromConflict(COLUMN_EXTRAS) + ", ?), ?)";
-		this.statementSaveExtrasPlayer = new InsertBuilder(TABLE_PLAYERS).column(COLUMN_PLAYER_ID).column(COLUMN_EXTRAS).
+		this.statementSaveExtrasPlayer = new InsertBuilder(this, TABLE_PLAYERS).column(COLUMN_PLAYER_ID).column(COLUMN_EXTRAS).
 				conflictUpdate(new InsertBuilder.ConflictUpdateBuilder(this, prefix + TABLE_PLAYERS + suffix).column(COLUMN_PLAYER_ID)).
 				build();
-		this.statementSaveExtrasProfile = new InsertBuilder(TABLE_PROFILES).
+		this.statementSaveExtrasProfile = new InsertBuilder(this, TABLE_PROFILES).
 				column(COLUMN_PLAYER_ID).column(COLUMN_PROFILE_ID).column(COLUMN_ITEMS).column(COLUMN_EXTRAS).
 				conflictUpdate(new InsertBuilder.ConflictUpdateBuilder(this, prefix + TABLE_PROFILES + suffix).
 						column(COLUMN_PLAYER_ID).column(COLUMN_PROFILE_ID)).
@@ -111,7 +112,7 @@ public abstract sealed class BackpackDatabase extends Database permits BackpackD
 	@ApiStatus.Internal
 	public void insertPlayer(@NotNull UUID playerID) {
 		LoggingManager.exceptionallyLog(this.plugin, CompletableFuture.runAsync(() -> {
-			try (Connection connection = getConnection(); PreparedStatement statement = connection.prepareStatement(STATEMENT_INSERT_PLAYER)) {
+			try (Connection connection = getConnection(); PreparedStatement statement = connection.prepareStatement(this.statementInsertPlayer)) {
 				statement.setString(1, playerID.toString());
 				statement.executeUpdate();
 			} catch (SQLException e) {
@@ -124,7 +125,7 @@ public abstract sealed class BackpackDatabase extends Database permits BackpackD
 	public void insertProfiles(@NotNull Map<@NotNull UUID, @NotNull Set<@NotNull UUID>> profilesMap) {
 		if (profilesMap.isEmpty()) return;
 		LoggingManager.exceptionallyLog(this.plugin, CompletableFuture.runAsync(() -> {
-			try (Connection connection = getConnection(); PreparedStatement statement = connection.prepareStatement(STATEMENT_INSERT_PROFILE)) {
+			try (Connection connection = getConnection(); PreparedStatement statement = connection.prepareStatement(this.statementInsertProfile)) {
 				for (Map.Entry<UUID, Set<UUID>> entry : profilesMap.entrySet()) {
 					for (UUID profileID : entry.getValue()) {
 						statement.setString(1, entry.getKey().toString());
