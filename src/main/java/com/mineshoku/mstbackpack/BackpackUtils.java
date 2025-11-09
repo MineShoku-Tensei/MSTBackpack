@@ -10,20 +10,17 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-public class BackpackUtils {
+public final class BackpackUtils {
 	private BackpackUtils() {}
 
 	@NotNull
-	public static CompletableFuture<@Nullable List<@Nullable ItemStack>> getItems(@NotNull UUID playerID,
-																				  @NotNull UUID profileID) {
-		return MSTBackpack.instance().backpackDatabase().getInfo(playerID, profileID).
-				thenApply(BackpackInfo::items);
+	public static CompletableFuture<@Nullable List<@Nullable ItemStack>> getItems(@NotNull UUID playerID, @NotNull UUID profileID) {
+		return MSTBackpack.instance().backpackDatabase().getInfo(playerID, profileID).thenApply(BackpackInfo::items);
 	}
 
 	@NotNull
-	public static CompletableFuture<Void> saveItems(@NotNull UUID playerID, @NotNull UUID profileID,
-													@Nullable List<@Nullable ItemStack> items) {
-		return MSTBackpack.instance().backpackDatabase().saveItems(new BackpackInfo(playerID, profileID, items));
+	public static CompletableFuture<Void> saveItems(@NotNull UUID playerID, @NotNull UUID profileID, @Nullable List<@Nullable ItemStack> items) {
+		return MSTBackpack.instance().backpackDatabase().saveItems(playerID, profileID, items);
 	}
 
 	@NotNull
@@ -37,8 +34,7 @@ public class BackpackUtils {
 	}
 
 	@NotNull
-	public static CompletableFuture<Void> updateExtrasProfile(@NotNull UUID playerID,
-															  @NotNull UUID profileID, int delta) {
+	public static CompletableFuture<Void> updateExtrasProfile(@NotNull UUID playerID, @NotNull UUID profileID, int delta) {
 		return updateExtras(playerID, profileID, delta);
 	}
 

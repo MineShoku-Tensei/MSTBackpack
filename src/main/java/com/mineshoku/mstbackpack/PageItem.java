@@ -29,17 +29,14 @@ public record PageItem(@NotNull Material material, @Nullable String name, @Nulla
 
 	@NotNull
 	@Contract("_, _, _, _, _, _ -> new")
-	public ItemStack toItemStack(@Positive int currentPage, @NonNegative int totalPages,
-								 @NonNegative int extrasPlayer, @NonNegative int extrasProfile,
+	public ItemStack toItemStack(@Positive int currentPage, @NonNegative int totalPages, @NonNegative int extrasPlayer, @NonNegative int extrasProfile,
 								 @NonNegative int extrasPlayerMax, @NonNegative int extrasProfileMax) {
 		ItemStack item = ItemStack.of(this.material);
 		item.editMeta(meta -> {
-			meta.itemName(replace(this.name, currentPage, totalPages, extrasPlayer, extrasProfile,
-					extrasPlayerMax, extrasProfileMax));
+			meta.itemName(replace(this.name, currentPage, totalPages, extrasPlayer, extrasProfile, extrasPlayerMax, extrasProfileMax));
 			if (this.lore != null) {
 				meta.lore(this.lore.stream().
-						map(str -> replace(str, currentPage, totalPages, extrasPlayer, extrasProfile,
-								extrasPlayerMax, extrasProfileMax)).toList());
+						map(str -> replace(str, currentPage, totalPages, extrasPlayer, extrasProfile, extrasPlayerMax, extrasProfileMax)).toList());
 			}
 			if (this.model != null) {
 				meta.setItemModel(this.model);
@@ -52,8 +49,7 @@ public record PageItem(@NotNull Material material, @Nullable String name, @Nulla
 	}
 
 	@NotNull
-	private static Component replace(@Nullable String str,
-									 @Positive int currentPage, @NonNegative int totalPages,
+	private static Component replace(@Nullable String str, @Positive int currentPage, @NonNegative int totalPages,
 									 @NonNegative int extrasPlayer, @NonNegative int extrasProfile,
 									 @NonNegative int extrasPlayerMax, @NonNegative int extrasProfileMax) {
 		if (TextUtils.isNullOrBlank(str)) return Component.empty();
