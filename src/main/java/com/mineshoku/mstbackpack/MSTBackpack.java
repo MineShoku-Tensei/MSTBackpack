@@ -1,19 +1,19 @@
 package com.mineshoku.mstbackpack;
 
-import com.mineshoku.mstbackpack.database.BackpackDatabase;
-import com.mineshoku.mstbackpack.database.BackpackLocalDB;
-import com.mineshoku.mstbackpack.database.BackpackMySQL;
-import com.mineshoku.mstutils.TextUtils;
-import com.mineshoku.mstutils.Utils;
+import com.mineshoku.mstutils.managers.LoggingManager;
+import com.mineshoku.mstutils.managers.MMOProfilesManager;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.ApiStatus;
+
+import java.util.Objects;
 
 public class MSTBackpack extends JavaPlugin {
 	private static MSTBackpack instance;
 
 	private BackpackConfig backpackConfig;
 	private BackpackDatabase backpackDatabase;
+	private BackpackCache backpackCache;
 	private BackpackCommandHandler backpackCommandHandler;
 
 	public MSTBackpack() {
@@ -23,34 +23,25 @@ public class MSTBackpack extends JavaPlugin {
 
 	@Override
 	public void onEnable() {
-		boolean failed = false;
+		Objects.requireNonNull(MMOProfilesManager.instance());
 		this.backpackConfig = new BackpackConfig(this);
 		try {
-			String host = this.backpackConfig.host();
-			if (TextUtils.isNullOrBlank(host)) {
-				this.backpackDatabase = new BackpackLocalDB(this);
-			} else {
-				try {
-					this.backpackDatabase = new BackpackMySQL(this, host);
-				} catch (Exception e) {
-					failed = true;
-					getLogger().severe("Failed connecting to MySQL DB!");
-				}
-			}
+			this.backpackDatabase = BackpackDatabase.create(this);
 		} catch (Exception e) {
-			failed = true;
-			Utils.logException(this, e);
-		}
-		if (failed) {
+			LoggingManager.instance().severe(this, e);
 			getLogger().severe("Disabling plugin");
 			Bukkit.getPluginManager().disablePlugin(this);
 			return;
 		}
+		this.backpackCache = new BackpackCache(this);
 		this.backpackCommandHandler = new BackpackCommandHandler(this);
 	}
 
 	@Override
 	public void onDisable() {
+		if (this.backpackCache != null) {
+			this.backpackCache.shutdown();
+		}
 		instance = null;
 	}
 
@@ -65,6 +56,10 @@ public class MSTBackpack extends JavaPlugin {
 
 	public BackpackDatabase backpackDatabase() {
 		return this.backpackDatabase;
+	}
+
+	public BackpackCache cacheListener() {
+		return this.backpackCache;
 	}
 
 	public BackpackCommandHandler backpackCommandHandler() {

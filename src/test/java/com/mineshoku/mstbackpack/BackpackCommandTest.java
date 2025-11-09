@@ -1,16 +1,13 @@
 package com.mineshoku.mstbackpack;
 
-import com.mineshoku.mstutils.Utils;
-import com.mineshoku.mstutils.tests.TestUtils;
-import com.mineshoku.mstutils.tests.mock.MMOPlayerProfile;
-import com.mineshoku.mstutils.tests.mock.MMOProfileProvider;
+import com.mineshoku.mstutils.TestUtils;
+import com.mineshoku.mstutils.models.Pair;
+import com.mineshoku.mstutils.tests.MockPlayerProfile;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import org.bukkit.Material;
-import org.bukkit.command.CommandSender;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.permissions.PermissionAttachment;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,10 +16,9 @@ import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
-import java.util.Collections;
-import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
-import java.util.stream.Collectors;
+import java.util.concurrent.ExecutionException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -32,12 +28,10 @@ public class BackpackCommandTest {
 
 	private ServerMock server;
 	private MSTBackpack plugin;
-	private MMOProfileProvider profileProvider;
 
 	@BeforeEach
 	void setUp() {
 		this.server = MockBukkit.mock();
-		this.profileProvider = TestUtils.getAndRegisterProfileProvider();
 		TestUtils.loadMSTUtils();
 		this.plugin = MockBukkit.load(MSTBackpack.class);
 	}
@@ -52,142 +46,150 @@ public class BackpackCommandTest {
 		TestUtils.testPluginLoadsSuccessfully(this.plugin);
 	}
 
-	@NotNull
-	List<String> tabComplete(@NotNull CommandSender sender, @NotNull String cmd) {
-		return this.server.getCommandTabComplete(sender, cmd);
-	}
-
-	void testStreamBase(int expected, @NotNull CommandSender sender) {
-		BackpackCommandHandler.BASE.stream().map(str -> str.charAt(0)).forEach(c -> assertSame(expected,
-				tabComplete(sender, TestUtils.cmd(COMMAND, false, c)).size()));
-	}
-
-	@NotNull
-	CommandSender console() {
-		return this.server.getConsoleSender();
-	}
-
-	@Test
-	void tabCompleteBase() {
-		TestUtils.assertSameValues(BackpackCommandHandler.BASE, tabComplete(console(), TestUtils.cmd(COMMAND, true)));
-		testStreamBase(1, console());
-		PlayerMock player1 = TestUtils.addPlayer(this.server, this.profileProvider),
-				player2 = TestUtils.addPlayer(this.server, this.profileProvider);
-		PermissionAttachment attachment = player1.addAttachment(this.plugin);
-		attachment.setPermission(BackpackCommandHandler.PERMISSION_ADVANCED, true);
-		TestUtils.assertSameValues(BackpackCommandHandler.BASE, tabComplete(player1, TestUtils.cmd(COMMAND, true)));
-		TestUtils.assertSameValues(Collections.emptyList(), tabComplete(player2, TestUtils.cmd(COMMAND, true)));
-		testStreamBase(1, player1);
-		testStreamBase(0, player2);
-	}
-
-	void tabCompleteSubSimpleCheck(@NotNull String sub) {
-		PlayerMock player1 = TestUtils.addPlayer(this.server, this.profileProvider);
-		PermissionAttachment attachment = player1.addAttachment(this.plugin);
-		attachment.setPermission(BackpackCommandHandler.PERMISSION_ADVANCED, true);
-		assertSame(0, tabComplete(player1, TestUtils.cmd(COMMAND, true, sub)).size());
-	}
-
-	@Test
-	void tabCompleteHelp() {
-		tabCompleteSubSimpleCheck("help");
-	}
-
-	@Test
-	void tabCompleteReload() {
-		tabCompleteSubSimpleCheck("reload");
-	}
-
-	void testSubAdvanced(@NotNull List<@NotNull String> list, @NotNull PlayerMock player,
-						 @NotNull String sub, @NotNull Object arg) {
-		TestUtils.assertSameValues(list, tabComplete(player, TestUtils.cmd(COMMAND, true, sub, arg)));
-	}
-
-	void tabCompleteSubAdvancedCheck(@NotNull String sub, boolean hasNoProfile) {
-		PlayerMock player1 = TestUtils.addPlayer(this.server, this.profileProvider),
-				player2 = TestUtils.addPlayer(this.server, this.profileProvider);
-		PermissionAttachment attachment = player1.addAttachment(this.plugin);
-		attachment.setPermission(BackpackCommandHandler.PERMISSION_ADVANCED, true);
-		TestUtils.disconnect(player2, this.profileProvider);
-		TestUtils.assertSameValues(List.of(BackpackCommandHandler.CURRENT, player1.getName()),
-				tabComplete(player1, TestUtils.cmd(COMMAND, true, sub)));
-		TestUtils.addProfiles(this.profileProvider, player1, 4);
-		List<String> result = this.profileProvider.getPlayerData(player1.getUniqueId()).getProfiles().stream().
-				map(MMOPlayerProfile::getUniqueId).map(UUID::toString).collect(Collectors.toList()),
-				setPlayer = hasNoProfile ? List.of(BackpackCommandHandler.EXTRAS_SET_PLAYER) : Collections.emptyList();
-		result.add(BackpackCommandHandler.CURRENT);
-		if (hasNoProfile) {
-			result.add(BackpackCommandHandler.EXTRAS_SET_PLAYER);
-		}
-		testSubAdvanced(result, player1, sub, BackpackCommandHandler.CURRENT);
-		testSubAdvanced(setPlayer, player1, sub, player2.getName());
-		testSubAdvanced(setPlayer, player1, sub, player2.getUniqueId());
-		assertSame(0, tabComplete(player1, TestUtils.cmd(COMMAND, true, sub, "aaaa")).size());
-	}
-
-	@Test
-	void tabCompleteOpen() {
-		tabCompleteSubAdvancedCheck("open", false);
-	}
-
-	@Test
-	void tabCompleteClear() {
-		tabCompleteSubAdvancedCheck("clear", false);
-	}
-
-	@Test
-	void tabCompleteUpgrade() {
-		tabCompleteSubAdvancedCheck("upgrade", true);
-	}
-
-	@Test
-	void tabCompleteDowngrade() {
-		tabCompleteSubAdvancedCheck("downgrade", true);
-	}
-
-	void performCommandWithAsync(@NotNull PlayerMock player, @NotNull String command) throws InterruptedException {
-		assertTrue(player.performCommand(command));
-		Thread.sleep(50);
-		this.server.getScheduler().performTicks(Utils.secondsToTicks(1));
+	void testOpenInventory(@NotNull PlayerMock player, boolean backpack, @NotNull Object @NotNull ... extras) throws InterruptedException {
+		TestUtils.performCommandWithAsync(this.server, player, TestUtils.cmd(COMMAND, false, extras));
+		assertSame(backpack ? InventoryType.CHEST : InventoryType.CRAFTING, player.getOpenInventory().getType());
+		player.closeInventory();
 	}
 
 	@Test
 	void commandRunBase() throws InterruptedException {
-		PlayerMock player1 = TestUtils.addPlayer(this.server, this.profileProvider),
-				player2 = TestUtils.addPlayer(this.server, this.profileProvider);
-		PermissionAttachment attachment = player1.addAttachment(this.plugin);
-		attachment.setPermission(PERMISSION, true);
-		TestUtils.addProfiles(this.profileProvider, player1, 2);
-		this.profileProvider.getPlayerData(player1.getUniqueId()).setCurrentProfileIfNotSet();
-		performCommandWithAsync(player1, COMMAND);
-		assertNotNull(player1.getOpenInventory().getTopInventory());
-		assertSame(InventoryType.CHEST, player1.getOpenInventory().getType());
-		performCommandWithAsync(player2, COMMAND);
-		assertSame(InventoryType.CRAFTING, player2.getOpenInventory().getType());
+		PlayerMock player1 = TestUtils.addPlayer(this.server), player2 = TestUtils.addPlayer(this.server);
+		TestUtils.setPermission(this.plugin, player1, PERMISSION, true);
+		TestUtils.addProfiles(player1, 2);
+		assertNotNull(TestUtils.setCurrentProfileIfNotSet(player1));
+		testOpenInventory(player1, true);
+		testOpenInventory(player2, false);
 	}
 
 	@Test
 	void commandRunOpen() throws InterruptedException {
-		PlayerMock player1 = TestUtils.addPlayer(this.server, this.profileProvider);
-		PermissionAttachment attachment = player1.addAttachment(this.plugin);
-		assertTrue(player1.performCommand(TestUtils.cmd(COMMAND, false, "open",
-				BackpackCommandHandler.CURRENT, BackpackCommandHandler.CURRENT)));
-		assertSame(InventoryType.CRAFTING, player1.getOpenInventory().getType());
-		attachment.setPermission(BackpackCommandHandler.PERMISSION_ADVANCED, true);
-		performCommandWithAsync(player1, TestUtils.cmd(COMMAND, false, "open",
-				BackpackCommandHandler.CURRENT, BackpackCommandHandler.CURRENT));
-		assertSame(InventoryType.CRAFTING, player1.getOpenInventory().getType());
-		TestUtils.addProfiles(this.profileProvider, player1, 1);
-		this.profileProvider.getPlayerData(player1.getUniqueId()).setCurrentProfileIfNotSet();
-		performCommandWithAsync(player1, TestUtils.cmd(COMMAND, false, "open",
-				BackpackCommandHandler.CURRENT, BackpackCommandHandler.CURRENT));
-		assertSame(InventoryType.CHEST, player1.getOpenInventory().getType());
+		PlayerMock player1 = TestUtils.addPlayer(this.server), player2 = TestUtils.addPlayer(this.server);
+		UUID playerID1 = player1.getUniqueId(), playerID2 = player2.getUniqueId(), playerID3;
+		do {
+			playerID3 = UUID.randomUUID();
+		} while (playerID3.equals(playerID1) || playerID3.equals(playerID2));
+		testOpenInventory(player1, false, "open", BackpackCommandHandler.CURRENT, BackpackCommandHandler.CURRENT);
+		TestUtils.setPermission(this.plugin, player1, BackpackCommandHandler.PERMISSION_ADVANCED, true);
+		TestUtils.setPermission(this.plugin, player2, PERMISSION, true);
+		testOpenInventory(player1, false, "open", BackpackCommandHandler.CURRENT, BackpackCommandHandler.CURRENT);
+		TestUtils.addProfiles(player1, 1);
+		TestUtils.addProfiles(player2, 1);
+		TestUtils.waitAsync(this.server);
+		MockPlayerProfile profile1 = TestUtils.setCurrentProfileIfNotSet(player1), profile2 = TestUtils.setCurrentProfileIfNotSet(player2);
+		assertNotNull(profile1);
+		assertNotNull(profile2);
+		UUID profileID1 = profile1.getUniqueId(), profileID2 = profile2.getUniqueId();
+		assertNotEquals(profileID1, profileID2);
+		testOpenInventory(player2, true, "open", playerID2);
+		testOpenInventory(player2, true, "open", playerID2, BackpackCommandHandler.CURRENT);
+		testOpenInventory(player2, true, "open", playerID2, profileID2);
+		testOpenInventory(player1, false, "open");
+		testOpenInventory(player1, true, "open", BackpackCommandHandler.CURRENT);
+		testOpenInventory(player1, true, "open", playerID1);
+		testOpenInventory(player1, true, "open", BackpackCommandHandler.CURRENT, BackpackCommandHandler.CURRENT);
+		testOpenInventory(player1, true, "open", BackpackCommandHandler.CURRENT, profileID1);
+		testOpenInventory(player1, false, "open", BackpackCommandHandler.CURRENT, profileID2);
+		testOpenInventory(player1, true, "open", playerID2);
+		testOpenInventory(player1, true, "open", playerID2, BackpackCommandHandler.CURRENT);
+		testOpenInventory(player1, true, "open", playerID2, profileID2);
+		testOpenInventory(player1, false, "open", playerID2, profileID1);
+		testOpenInventory(player1, false, "open", playerID3);
+		testOpenInventory(player1, false, "open", playerID3, BackpackCommandHandler.CURRENT);
+		testOpenInventory(player1, false, "open", playerID3, profileID1);
+		TestUtils.disconnect(player2);
+		testOpenInventory(player1, false, "open", playerID2);
+		testOpenInventory(player1, false, "open", playerID2, BackpackCommandHandler.CURRENT);
+		testOpenInventory(player1, true, "open", playerID2, profileID2);
+	}
+
+	void checkExtras(@NotNull UUID playerID, @NotNull UUID profileID, int extrasPlayer, int extrasProfile) throws ExecutionException, InterruptedException {
+		assertEquals(Pair.of(extrasPlayer, extrasProfile), this.plugin.backpackDatabase().getExtras(playerID, profileID).get());
+	}
+
+	@Test
+	void commandRunUpgradeDowngrade() throws ExecutionException, InterruptedException {
+		PlayerMock player = TestUtils.addPlayer(this.server);
+		TestUtils.setPermission(this.plugin, player, BackpackCommandHandler.PERMISSION_ADVANCED, true);
+		TestUtils.addProfiles(player, 1);
+		UUID playerID = player.getUniqueId(), profileID = Objects.requireNonNull(TestUtils.setCurrentProfileIfNotSet(player)).getUniqueId();
+		String playerName = player.getName();
+		int playerMax = this.plugin.backpackConfig().amountExtraPlayerMax(), profileMax = this.plugin.backpackConfig().amountExtraProfileMax();
+		TestUtils.waitAsync(this.server);
+		TestUtils.performCommandWithAsync(this.server, player, TestUtils.cmd(COMMAND, false, "upgrade", playerID));
+		checkExtras(playerID, profileID, 1, 0);
+		TestUtils.performCommandWithAsync(this.server, player, TestUtils.cmd(COMMAND, false, "upgrade", playerName));
+		checkExtras(playerID, profileID, 2, 0);
+		TestUtils.performCommandWithAsync(this.server, player, TestUtils.cmd(COMMAND, false, "upgrade", playerID, BackpackCommandHandler.EXTRAS_SET_PLAYER));
+		checkExtras(playerID, profileID, 3, 0);
+		TestUtils.performCommandWithAsync(this.server, player, TestUtils.cmd(COMMAND, false, "upgrade", playerName, BackpackCommandHandler.EXTRAS_SET_PLAYER));
+		checkExtras(playerID, profileID, 4, 0);
+		TestUtils.performCommandWithAsync(this.server, player, TestUtils.cmd(COMMAND, false, "upgrade", playerID, profileID));
+		checkExtras(playerID, profileID, 4, 1);
+		TestUtils.performCommandWithAsync(this.server, player, TestUtils.cmd(COMMAND, false, "upgrade", playerName, profileID));
+		checkExtras(playerID, profileID, 4, 2);
+		TestUtils.performCommandWithAsync(this.server, player, TestUtils.cmd(COMMAND, false, "upgrade", playerID, profileID, 2));
+		checkExtras(playerID, profileID, 4, 4);
+		TestUtils.performCommandWithAsync(this.server, player, TestUtils.cmd(COMMAND, false, "upgrade", playerID, profileID, 100));
+		TestUtils.performCommandWithAsync(this.server, player, TestUtils.cmd(COMMAND, false, "upgrade", playerID, BackpackCommandHandler.EXTRAS_SET_PLAYER, 100));
+		checkExtras(playerID, profileID, playerMax, profileMax);
+		TestUtils.performCommandWithAsync(this.server, player, TestUtils.cmd(COMMAND, false, "downgrade", playerID));
+		checkExtras(playerID, profileID, playerMax - 1, profileMax);
+		TestUtils.performCommandWithAsync(this.server, player, TestUtils.cmd(COMMAND, false, "downgrade", playerName));
+		checkExtras(playerID, profileID, playerMax - 2, profileMax);
+		TestUtils.performCommandWithAsync(this.server, player, TestUtils.cmd(COMMAND, false, "downgrade", playerID, BackpackCommandHandler.EXTRAS_SET_PLAYER));
+		checkExtras(playerID, profileID, playerMax - 3, profileMax);
+		TestUtils.performCommandWithAsync(this.server, player, TestUtils.cmd(COMMAND, false, "downgrade", playerName, BackpackCommandHandler.EXTRAS_SET_PLAYER));
+		checkExtras(playerID, profileID, playerMax - 4, profileMax);
+		TestUtils.performCommandWithAsync(this.server, player, TestUtils.cmd(COMMAND, false, "downgrade", playerID, profileID));
+		checkExtras(playerID, profileID, playerMax - 4, profileMax - 1);
+		TestUtils.performCommandWithAsync(this.server, player, TestUtils.cmd(COMMAND, false, "downgrade", playerName, profileID));
+		checkExtras(playerID, profileID, playerMax - 4, profileMax - 2);
+		TestUtils.performCommandWithAsync(this.server, player, TestUtils.cmd(COMMAND, false, "downgrade", playerID, profileID, 2));
+		checkExtras(playerID, profileID, playerMax - 4, profileMax - 4);
+		TestUtils.performCommandWithAsync(this.server, player, TestUtils.cmd(COMMAND, false, "downgrade", playerID, profileID, 100));
+		TestUtils.performCommandWithAsync(this.server, player, TestUtils.cmd(COMMAND, false, "downgrade", playerID, BackpackCommandHandler.EXTRAS_SET_PLAYER, 100));
+		checkExtras(playerID, profileID, 0, 0);
+	}
+
+	@Test
+	void commandRunInfo() throws InterruptedException {
+		PlayerMock player1 = TestUtils.addPlayer(this.server), player2 = TestUtils.addPlayer(this.server);
+		TestUtils.setPermission(this.plugin, player1, BackpackCommandHandler.PERMISSION_ADVANCED, true);
+		TestUtils.setPermission(this.plugin, player2, BackpackCommandHandler.PERMISSION_ADVANCED, true);
+		TestUtils.addProfiles(player1, 1);
+		UUID playerID = player1.getUniqueId(), profileID = Objects.requireNonNull(TestUtils.setCurrentProfileIfNotSet(player1)).getUniqueId();
+		int maxPlayer = this.plugin.backpackConfig().amountExtraPlayerMax(), maxProfile = this.plugin.backpackConfig().amountExtraProfileMax();
+		String playerName = player1.getName();
+		TestUtils.waitAsync(this.server);
+		Component msg0Player = this.plugin.backpackConfig().messageExtrasInfo(playerID, playerName, null, 0, 0),
+				msg0Profile = this.plugin.backpackConfig().messageExtrasInfo(playerID, playerName, profileID, 0, 0),
+				msgPlayer = this.plugin.backpackConfig().messageExtrasInfo(playerID, playerName, null, maxPlayer, 0),
+				msgProfile = this.plugin.backpackConfig().messageExtrasInfo(playerID, playerName, profileID, maxPlayer, maxProfile);
+		TestUtils.performCommandWithAsync(this.server, player1, TestUtils.cmd(COMMAND, false, "info", playerID));
+		assertEquals(msg0Player, player1.nextComponentMessage());
+		TestUtils.performCommandWithAsync(this.server, player1, TestUtils.cmd(COMMAND, false, "info", playerName));
+		assertEquals(msg0Player, player1.nextComponentMessage());
+		TestUtils.performCommandWithAsync(this.server, player1, TestUtils.cmd(COMMAND, false, "info", playerID, profileID));
+		assertEquals(msg0Profile, player1.nextComponentMessage());
+		TestUtils.performCommandWithAsync(this.server, player1, TestUtils.cmd(COMMAND, false, "info", playerName, profileID));
+		assertEquals(msg0Profile, player1.nextComponentMessage());
+		TestUtils.performCommandWithAsync(this.server, player1, TestUtils.cmd(COMMAND, false, "upgrade", playerID, profileID, 100));
+		TestUtils.performCommandWithAsync(this.server, player1, TestUtils.cmd(COMMAND, false, "upgrade", playerID, BackpackCommandHandler.EXTRAS_SET_PLAYER, 100));
+		TestUtils.disconnect(player1);
+		TestUtils.performCommandWithAsync(this.server, player2, TestUtils.cmd(COMMAND, false, "info", playerID));
+		assertEquals(msgPlayer, player2.nextComponentMessage());
+		TestUtils.performCommandWithAsync(this.server, player2, TestUtils.cmd(COMMAND, false, "info", playerName));
+		assertEquals(msgPlayer, player2.nextComponentMessage());
+		TestUtils.performCommandWithAsync(this.server, player2, TestUtils.cmd(COMMAND, false, "info", playerID, profileID));
+		assertEquals(msgProfile, player2.nextComponentMessage());
+		TestUtils.performCommandWithAsync(this.server, player2, TestUtils.cmd(COMMAND, false, "info", playerName, profileID));
+		assertEquals(msgProfile, player2.nextComponentMessage());
 	}
 
 	@Test
 	void pageItem() {
-		ItemStack item = new PageItem(Material.DIRT, "<page-2><page-1><page><page+1><page+2>", null, null, null, 0).
-				toItemStack(4, 10, 0, 0, 0, 0);
+		ItemStack item = new PageItem(Material.DIRT, "<page-2><page-1><page><page+1><page+2>", null, null, null, 0).toItemStack(4, 10, 0, 0, 0, 0);
 		Component name = item.getItemMeta().itemName();
 		assertInstanceOf(TextComponent.class, name);
 		assertEquals("23456", ((TextComponent) name).content());
