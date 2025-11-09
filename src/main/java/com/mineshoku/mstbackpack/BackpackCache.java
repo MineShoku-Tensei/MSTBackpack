@@ -82,10 +82,8 @@ public final class BackpackCache implements Listener {
 
 	private void addPlayer(@NotNull UUID playerID) {
 		Set<UUID> profiles = MMOProfilesManager.instance().getProfileIDs(playerID);
-		if (!this.cache.containsKey(playerID)) {
-			this.plugin.backpackDatabase().insertPlayer(playerID);
-		}
 		this.cache.put(playerID, profiles == null ? new LinkedHashSet<>() : new LinkedHashSet<>(profiles));
+		this.plugin.backpackDatabase().insertPlayer(playerID);
 		if (profiles == null) return;
 		this.plugin.backpackDatabase().insertProfiles(Map.of(playerID, profiles));
 	}
