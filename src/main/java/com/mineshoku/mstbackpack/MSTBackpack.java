@@ -1,5 +1,6 @@
 package com.mineshoku.mstbackpack;
 
+import com.google.common.base.Preconditions;
 import com.mineshoku.mstutils.managers.LoggingManager;
 import com.mineshoku.mstutils.managers.MMOProfilesManager;
 import org.bukkit.Bukkit;
@@ -17,7 +18,7 @@ public class MSTBackpack extends JavaPlugin {
 	private BackpackCommandHandler backpackCommandHandler;
 
 	public MSTBackpack() {
-		if (instance != null) throw new IllegalStateException("MSTBackpack main already present?");
+		Preconditions.checkState(instance == null, "MSTBackpack main already present?");
 		instance = this;
 	}
 

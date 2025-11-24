@@ -1,5 +1,6 @@
 package com.mineshoku.mstbackpack;
 
+import com.google.common.base.Preconditions;
 import com.mineshoku.mstutils.Utils;
 import com.mineshoku.mstutils.managers.ExecutorManager;
 import com.mineshoku.mstutils.managers.LoggingManager;
@@ -28,7 +29,7 @@ public final class BackpackCache implements Listener {
 	private final @NotNull BukkitTask schedule;
 
 	public BackpackCache(@NotNull MSTBackpack plugin) {
-		if (plugin.cacheListener() != null) throw new IllegalStateException("Backpack cache listener already initialized");
+		Preconditions.checkState(plugin.cacheListener() == null, "Backpack cache listener already initialized");
 		this.plugin = plugin;
 		this.schedule = Bukkit.getScheduler().runTaskTimerAsynchronously(this.plugin, this::update, 0, Utils.secondsToTicks(TimeUnit.MINUTES.toSeconds(1)));
 		this.plugin.getServer().getPluginManager().registerEvents(this, this.plugin);
@@ -42,41 +43,41 @@ public final class BackpackCache implements Listener {
 
 	private void update() {
 		this.plugin.backpackDatabase().getProfiles().exceptionally(e -> {
-			LoggingManager.instance().log(this.plugin, e);
+			LoggingManager.instance().logError(this.plugin, e);
 			return new LinkedHashMap<>();
 		}).thenCombine(this.plugin.backpackDatabase().getPlayers().exceptionally(e -> {
-			LoggingManager.instance().log(this.plugin, e);
+			LoggingManager.instance().logError(this.plugin, e);
 			return new LinkedHashSet<>();
 		}), (profilesMap, players) -> {
 			players.forEach(playerID -> profilesMap.putIfAbsent(playerID, new LinkedHashSet<>()));
 			return profilesMap;
 		}).thenAcceptAsync(profilesMap -> {
-			Map<UUID, Set<UUID>> remove = new HashMap<>(), insert = new HashMap<>();
+			Map<UUID, Set<UUID>> profilesToRemove = new HashMap<>(), profilesToInsert = new HashMap<>();
 			profilesMap.forEach((playerID, profiles) -> {
 				LinkedHashSet<UUID> profilesOnline = MMOProfilesManager.instance().getProfileIDs(playerID);
 				if (profilesOnline == null) {
-					LinkedHashSet<UUID> existing = this.cache.computeIfAbsent(playerID, u -> new LinkedHashSet<>()), local = new LinkedHashSet<>(existing);
+					LinkedHashSet<UUID> existing = this.cache.computeIfAbsent(playerID, uuid -> new LinkedHashSet<>()), local = new LinkedHashSet<>(existing);
 					existing.addAll(profiles);
 					local.removeAll(profiles);
 					if (!local.isEmpty()) {
-						insert.put(playerID, local);
+						profilesToInsert.put(playerID, local);
 					}
 				} else {
 					LinkedHashSet<UUID> existing = this.cache.put(playerID, new LinkedHashSet<>(profilesOnline));
 					if (existing == null) {
-						insert.put(playerID, new LinkedHashSet<>(profilesOnline));
+						profilesToInsert.put(playerID, new LinkedHashSet<>(profilesOnline));
 					} else {
 						existing.removeAll(profilesOnline);
 						if (!existing.isEmpty()) {
-							remove.put(playerID, existing);
+							profilesToRemove.put(playerID, existing);
 						}
 					}
 				}
 			});
-			if (this.plugin.backpackConfig().removeBackpackProfileDelete()) {
-				LoggingManager.exceptionallyLog(this.plugin, this.plugin.backpackDatabase().removeProfiles(remove));
+			if (this.plugin.backpackConfig().snapshot().removeBackpackProfileDelete()) {
+				LoggingManager.exceptionallyLogError(this.plugin, this.plugin.backpackDatabase().removeProfiles(profilesToRemove));
 			}
-			this.plugin.backpackDatabase().insertProfiles(insert);
+			this.plugin.backpackDatabase().insertProfiles(profilesToInsert);
 		}, ExecutorManager.mainThreadExecutor(this.plugin));
 	}
 
@@ -90,14 +91,14 @@ public final class BackpackCache implements Listener {
 
 	private void addProfile(@NotNull UUID playerID, @NotNull UUID profileID) {
 		if (!MMOProfilesManager.instance().hasPlayerProfile(playerID, profileID)) return;
-		this.cache.computeIfAbsent(playerID, u -> new LinkedHashSet<>()).add(profileID);
+		this.cache.computeIfAbsent(playerID, uuid -> new LinkedHashSet<>()).add(profileID);
 		this.plugin.backpackDatabase().insertProfiles(Map.of(playerID, Set.of(profileID)));
 	}
 
 	private void removeProfile(@NotNull UUID playerID, @NotNull UUID profileID) {
 		if (MMOProfilesManager.instance().hasPlayerProfile(playerID, profileID)) return;
 		this.cache.getOrDefault(playerID, new LinkedHashSet<>()).remove(profileID);
-		LoggingManager.exceptionallyLog(this.plugin, this.plugin.backpackDatabase().removeProfiles(Map.of(playerID, Set.of(profileID))));
+		LoggingManager.exceptionallyLogError(this.plugin, this.plugin.backpackDatabase().removeProfiles(Map.of(playerID, Set.of(profileID))));
 	}
 
 	@Nullable

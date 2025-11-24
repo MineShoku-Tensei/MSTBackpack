@@ -1,5 +1,6 @@
 package com.mineshoku.mstbackpack;
 
+import com.google.common.base.Preconditions;
 import com.mineshoku.mstutils.MathUtils;
 import com.mineshoku.mstutils.TextUtils;
 import com.mineshoku.mstutils.Utils;
@@ -42,10 +43,10 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 	private static final @NotNull String HELP3 = "";
 	private static final @NotNull String HELP_RELOAD = "reload - reload config file";
 	private static final @NotNull String HELP_OPEN = "open <player> <optional:profile> - open player's backpack (" + HELP_NO_PROFILE + ")";
-	private static final @NotNull String HELP_CLEAR = "clear <player> <optional:profile> - clear player's backpack(" + HELP_NO_PROFILE + ")";
-	private static final @NotNull String HELP_UPGRADE = "upgrade <player> <optional:profile> <n> - +n extras (" + HELP_SET_PLAYER + ")";
-	private static final @NotNull String HELP_DOWNGRADE = "downgrade <player> <optional:profile> <n> - -n extras (" + HELP_SET_PLAYER + ")";
-	private static final @NotNull String HELP_INFO = "info <player> <optional:profile> <n> - player info (" + HELP_SET_PLAYER + ")";
+	private static final @NotNull String HELP_CLEAR = "clear <player> <optional:profile> - clear player's backpack (" + HELP_NO_PROFILE + ")";
+	private static final @NotNull String HELP_UPGRADE = "upgrade <player> <optional:profile> <optional:n> - +n extras (" + HELP_SET_PLAYER + ")";
+	private static final @NotNull String HELP_DOWNGRADE = "downgrade <player> <optional:profile> <optional:n> - -n extras (" + HELP_SET_PLAYER + ")";
+	private static final @NotNull String HELP_INFO = "info <player> <optional:profile> - player info (" + HELP_SET_PLAYER + ")";
 	private static final @NotNull Component HELP;
 
 	static {
@@ -60,7 +61,7 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 	private final @NotNull Map<@NotNull String, @NotNull ClearInfo> timesOthers = new HashMap<>();
 
 	public BackpackCommandHandler(@NotNull MSTBackpack plugin) {
-		if (plugin.backpackCommandHandler() != null) throw new IllegalStateException("Command handler already initialized");
+		Preconditions.checkState(plugin.backpackCommandHandler() == null, "Command handler already initialized");
 		this.plugin = plugin;
 		this.command = Objects.requireNonNull(plugin.getCommand("backpack"));
 		this.command.setExecutor(this);
@@ -71,15 +72,13 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 		this.plugin.backpackDatabase().getInfo(playerID, profileID).thenAcceptAsync(info -> {
 			if (requireInDB && !info.inDB()) return;
 			try {
-				if (new BackpackMenu(this.plugin, player, info).openInventory() == null) {
-					Utils.sendMessage(player, this.plugin.backpackConfig().messageOpenFail());
-				}
+				new BackpackMenuPages(this.plugin, info, player).open();
 			} catch (Exception e) {
 				throw new CompletionException(e);
 			}
 		}, ExecutorManager.mainThreadExecutor(this.plugin)).exceptionally(e -> {
-			LoggingManager.instance().log(this.plugin, e);
-			Utils.sendMessage(player, this.plugin.backpackConfig().messageOpenFail());
+			LoggingManager.instance().logError(this.plugin, e);
+			Utils.sendMessage(player, this.plugin.backpackConfig().snapshot().messageOpenFail());
 			return null;
 		});
 	}
@@ -93,10 +92,10 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 			if (idx == 1) {
 				try {
 					this.plugin.reload();
-					Utils.sendMessage(sender, this.plugin.backpackConfig().messageReloaded());
+					Utils.sendMessage(sender, this.plugin.backpackConfig().snapshot().messageReloaded());
 				} catch (Exception e) {
-					LoggingManager.instance().log(this.plugin, e);
-					Utils.sendMessage(sender, this.plugin.backpackConfig().messageCommandFailed());
+					LoggingManager.instance().logError(this.plugin, e);
+					Utils.sendMessage(sender, this.plugin.backpackConfig().snapshot().messageCommandFailed());
 				}
 				return true;
 			}
@@ -115,10 +114,15 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 				profileSelector = args[2];
 			}
 			playerSelector = args[1];
-			Integer extrasAmount = (idx == INDEX_UPGRADE || idx == INDEX_DOWNGRADE) && args.length > 3 ? MathUtils.getInteger(args[3]) : Integer.valueOf(1);
-			if (extrasAmount == null) {
-				Utils.sendMessage(sender, HELP);
-				return true;
+			Integer extrasAmount;
+			if ((idx == INDEX_UPGRADE || idx == INDEX_DOWNGRADE) && args.length > 3) {
+				extrasAmount = MathUtils.getInteger(args[3]);
+				if (extrasAmount == null) {
+					Utils.sendMessage(sender, HELP);
+					return true;
+				}
+			} else {
+				extrasAmount = 1;
 			}
 			boolean currentPlayer = CURRENT.equals(playerSelector), currentProfile = CURRENT.equals(profileSelector),
 					extrasSetPlayer = EXTRAS_SET_PLAYER.equals(profileSelector);
@@ -126,7 +130,7 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 			UUID pID = currentPlayer ? ((Player) sender).getUniqueId() : Utils.getUUID(playerSelector);
 			(pID == null ? PlayersCache.instance().byName(playerSelector) : PlayersCache.instance().byID(pID)).thenApplyAsync(info -> {
 				if (info == null) {
-					Utils.sendMessage(sender, this.plugin.backpackConfig().messageNotFoundPlayer());
+					Utils.sendMessage(sender, this.plugin.backpackConfig().snapshot().messageNotFoundPlayer());
 					throw new StopCompletableFutureException();
 				}
 				return info;
@@ -139,14 +143,14 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 				} else if (currentProfile) {
 					profileID = MMOProfilesManager.instance().getCurrentProfileID(info.id());
 					if (profileID == null) {
-						Utils.sendMessage(sender, player == null ? this.plugin.backpackConfig().messageNotFoundProfile() :
-								this.plugin.backpackConfig().messageProfileNotSelected());
+						Utils.sendMessage(sender, player == null ? this.plugin.backpackConfig().snapshot().messageNotFoundProfile() :
+								this.plugin.backpackConfig().snapshot().messageProfileNotSelected());
 						throw new StopCompletableFutureException();
 					}
 				} else {
 					profileID = Utils.getUUID(profileSelector);
 					if (profileID == null) {
-						Utils.sendMessage(sender, this.plugin.backpackConfig().messageNotFoundProfile());
+						Utils.sendMessage(sender, this.plugin.backpackConfig().snapshot().messageNotFoundProfile());
 						throw new StopCompletableFutureException();
 					}
 				}
@@ -162,23 +166,23 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 					Optional<UUID> senderID = senderPlayer.map(Player::getUniqueId);
 					String senderName = sender.getName();
 					ClearInfo clearInfo = senderID.isEmpty() ? this.timesOthers.remove(senderName) : this.timesPlayers.remove(senderID.get());
-					if (this.plugin.backpackConfig().clearTimeout() == 0 || clearInfo == null ||
-							(now - clearInfo.time() > this.plugin.backpackConfig().clearTimeout())) {
+					long clearTimeout = this.plugin.backpackConfig().snapshot().clearTimeoutMillis();
+					if (clearTimeout == 0 || clearInfo == null || (now - clearInfo.time() > clearTimeout)) {
 						clearInfo = new ClearInfo(info.id(), profileID, now);
 						if (senderID.isEmpty()) {
 							this.timesOthers.put(senderName, clearInfo);
 						} else {
 							this.timesPlayers.put(senderID.get(), clearInfo);
 						}
-						Utils.sendMessage(sender, this.plugin.backpackConfig().messageClearResend(info.id(), info.name(), profileID));
+						Utils.sendMessage(sender, this.plugin.backpackConfig().snapshot().messageClearResend(info.id(), info.name(), profileID));
 					} else {
 						this.plugin.backpackDatabase().saveItems(info.id(), profileID).whenComplete((ignored, e) -> {
 							Component msg;
 							if (e == null) {
-								msg = this.plugin.backpackConfig().messageClearFinish(info.id(), info.name(), profileID);
+								msg = this.plugin.backpackConfig().snapshot().messageClearFinish(info.id(), info.name(), profileID);
 							} else {
-								LoggingManager.instance().log(this.plugin, e);
-								msg = this.plugin.backpackConfig().messageCommandFailed();
+								LoggingManager.instance().logError(this.plugin, e);
+								msg = this.plugin.backpackConfig().snapshot().messageCommandFailed();
 							}
 							Utils.sendMessage(sender, msg);
 						});
@@ -191,21 +195,21 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 				UUID profileID = pair.second();
 				assert info != null;
 				if (idx == INDEX_INFO) return this.plugin.backpackDatabase().getExtras(info.id(), profileID).
-						thenAccept(extras -> Utils.sendMessage(sender, plugin.backpackConfig().messageExtrasInfo(info.id(), info.name(), profileID,
-								extras.first(), extras.second())));
+						thenAccept(extras -> Utils.sendMessage(sender,
+								this.plugin.backpackConfig().snapshot().messageExtrasInfo(info.id(), info.name(), profileID, extras.first(), extras.second())));
 				if (idx != INDEX_UPGRADE && idx != INDEX_DOWNGRADE) throw new RuntimeException("Missed backpack condition");
 				int delta = idx == INDEX_DOWNGRADE ? Math.negateExact(Math.abs(extrasAmount)) : Math.abs(extrasAmount);
 				return this.plugin.backpackDatabase().updateExtras(info.id(), profileID, delta).
 						thenCompose(v -> this.plugin.backpackDatabase().getExtras(info.id(), profileID)).
 						thenAccept(extras -> {
-							Utils.sendMessage(sender, this.plugin.backpackConfig().messageExtrasSet(info.id(), info.name(), profileID));
-							Utils.sendMessage(sender, this.plugin.backpackConfig().messageExtrasInfo(info.id(), info.name(), profileID,
+							Utils.sendMessage(sender, this.plugin.backpackConfig().snapshot().messageExtrasSet(info.id(), info.name(), profileID));
+							Utils.sendMessage(sender, this.plugin.backpackConfig().snapshot().messageExtrasInfo(info.id(), info.name(), profileID,
 									extras.first(), extras.second()));
 						});
 			}).exceptionally(e -> {
-				LoggingManager.instance().log(this.plugin, e);
+				LoggingManager.instance().logError(this.plugin, e);
 				if (!(LoggingManager.initialCause(e) instanceof StopCompletableFutureException)) {
-					Utils.sendMessage(sender, plugin.backpackConfig().messageCommandFailed());
+					Utils.sendMessage(sender, plugin.backpackConfig().snapshot().messageCommandFailed());
 				}
 				return null;
 			});
@@ -214,7 +218,7 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 		if (senderPlayer.isEmpty()) return true;
 		UUID playerID = senderPlayer.get().getUniqueId(), profileID = MMOProfilesManager.instance().getCurrentProfileID(playerID);
 		if (profileID == null) {
-			Utils.sendMessage(sender, this.plugin.backpackConfig().messageProfileNotSelected());
+			Utils.sendMessage(sender, this.plugin.backpackConfig().snapshot().messageProfileNotSelected());
 		} else {
 			openBackpack(senderPlayer.get(), playerID, profileID, false);
 		}
@@ -247,12 +251,14 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 			}
 			if (playerID == null) return new ArrayList<>();
 			SequencedSet<UUID> profileIDs = this.plugin.cacheListener().profiles(playerID);
-			Stream<String> special = Stream.empty(), profiles = profileIDs == null ? Stream.empty() : profileIDs.stream().map(UUID::toString);
+			Stream<String> special, profiles = profileIDs == null ? Stream.empty() : profileIDs.stream().map(UUID::toString);
 			boolean isOnline = Bukkit.getPlayer(playerID) != null;
 			if (idx == INDEX_UPGRADE || idx == INDEX_DOWNGRADE) {
 				special = isOnline ? Stream.of(CURRENT, EXTRAS_SET_PLAYER) : Stream.of(EXTRAS_SET_PLAYER);
 			} else if ((idx == INDEX_OPEN || idx == INDEX_CLEAR) && isOnline) {
 				special = Stream.of(CURRENT);
+			} else {
+				special = Stream.empty();
 			}
 			return Stream.concat(special, profiles).filter(cmd -> Utils.checkTabComplete(args[2], cmd)).toList();
 		}
@@ -260,8 +266,8 @@ public final class BackpackCommandHandler implements CommandExecutor, TabComplet
 	}
 
 	public void reload() {
-		this.command.setUsage(this.plugin.backpackConfig().commandUsage());
-		this.command.setDescription(this.plugin.backpackConfig().commandDescription());
+		this.command.setUsage(Utils.thisOrThat(this.plugin.backpackConfig().snapshot().commandUsage(), ""));
+		this.command.setDescription(Utils.thisOrThat(this.plugin.backpackConfig().snapshot().commandDescription(), ""));
 	}
 
 	private record ClearInfo(@NotNull UUID playerID, @NotNull UUID profileID, @Positive long time) {}
