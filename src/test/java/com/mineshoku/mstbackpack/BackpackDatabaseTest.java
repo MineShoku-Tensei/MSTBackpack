@@ -30,7 +30,7 @@ public class BackpackDatabaseTest {
 	@BeforeEach
 	void setUp() {
 		this.server = MockBukkit.mock();
-		TestUtils.loadMSTUtils();
+		TestUtils.loadUtilsPlugin();
 		this.plugin = MockBukkit.load(MSTBackpack.class);
 	}
 
@@ -101,12 +101,12 @@ public class BackpackDatabaseTest {
 		ItemStack dirt = ItemStack.of(Material.DIRT), stone = ItemStack.of(Material.STONE);
 		List<ItemStack> items1 = Arrays.asList(dirt, null, null, stone, null, null, dirt),
 				items2 = Arrays.asList(dirt, dirt, stone, stone, dirt, dirt, stone, stone);
-		LoggingManager.exceptionallyLog(this.plugin, BackpackUtils.saveItems(playerID, profileID, items1).
+		LoggingManager.exceptionallyLogError(this.plugin, BackpackUtils.saveItems(playerID, profileID, items1).
 				thenCompose(v -> BackpackUtils.getItems(playerID, profileID)).
 				thenApply(items -> items == null ? null : InventoryUtils.condenseItems(items)).
 				thenApply(items -> new BackpackInfo(playerID, profileID, items).items()).
 				thenAccept(items -> TestUtils.assertSameValues(InventoryUtils.condenseItems(items1), items))).get();
-		LoggingManager.exceptionallyLog(this.plugin, BackpackUtils.saveItems(playerID, profileID, items2).
+		LoggingManager.exceptionallyLogError(this.plugin, BackpackUtils.saveItems(playerID, profileID, items2).
 				thenCompose(v -> BackpackUtils.getItems(playerID, profileID)).
 				thenApply(items -> items == null ? null : InventoryUtils.condenseItems(items)).
 				thenApply(items -> new BackpackInfo(playerID, profileID, items).items()).

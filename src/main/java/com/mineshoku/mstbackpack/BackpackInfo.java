@@ -1,5 +1,6 @@
 package com.mineshoku.mstbackpack;
 
+import com.mineshoku.mstutils.Utils;
 import org.bukkit.inventory.ItemStack;
 import org.checkerframework.checker.index.qual.NonNegative;
 import org.jetbrains.annotations.*;
@@ -41,7 +42,7 @@ public record BackpackInfo(@NotNull UUID playerID, @NotNull UUID profileID, @Non
 	@Contract("null -> null")
 	private static List<@Nullable ItemStack> fixItems(@Nullable List<@Nullable ItemStack> items) {
 		if (items == null || items.isEmpty()) return null;
-		items = items.stream().map(item -> item == null || item.isEmpty() ? null : item).collect(Collectors.toList());
+		items = items.stream().map(Utils::nullIfEmpty).collect(Collectors.toList());
 		while (items.getLast() == null) {
 			items.removeLast();
 		}

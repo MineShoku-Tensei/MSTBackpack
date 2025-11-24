@@ -1,5 +1,6 @@
 package com.mineshoku.mstbackpack;
 
+import com.google.common.base.Preconditions;
 import com.mineshoku.mstutils.Utils;
 import com.mineshoku.mstutils.database.Database;
 import com.mineshoku.mstutils.database.LocalDatabaseType;
@@ -60,16 +61,16 @@ public abstract sealed class BackpackDatabase extends Database permits BackpackD
 		this.statementSaveItems = new InsertBuilder(this, TABLE_PROFILES).
 				column(COLUMN_PLAYER_ID).column(COLUMN_PROFILE_ID).column(COLUMN_ITEMS).
 				conflictUpdate(new InsertBuilder.ConflictUpdateBuilder(this, COLUMN_ITEMS + "=" + fromConflict(COLUMN_ITEMS)).
-						column(COLUMN_PLAYER_ID).column(COLUMN_PROFILE_ID)).build();
+						keyColumn(COLUMN_PLAYER_ID).keyColumn(COLUMN_PROFILE_ID)).build();
 		String prefix = COLUMN_EXTRAS + "=" + functionMin() + "(" + functionMax() + "(",
 				suffix = "." + COLUMN_EXTRAS + " + " + fromConflict(COLUMN_EXTRAS) + ", ?), ?)";
 		this.statementSaveExtrasPlayer = new InsertBuilder(this, TABLE_PLAYERS).column(COLUMN_PLAYER_ID).column(COLUMN_EXTRAS).
-				conflictUpdate(new InsertBuilder.ConflictUpdateBuilder(this, prefix + TABLE_PLAYERS + suffix).column(COLUMN_PLAYER_ID)).
+				conflictUpdate(new InsertBuilder.ConflictUpdateBuilder(this, prefix + TABLE_PLAYERS + suffix).keyColumn(COLUMN_PLAYER_ID)).
 				build();
 		this.statementSaveExtrasProfile = new InsertBuilder(this, TABLE_PROFILES).
 				column(COLUMN_PLAYER_ID).column(COLUMN_PROFILE_ID).column(COLUMN_ITEMS).column(COLUMN_EXTRAS).
 				conflictUpdate(new InsertBuilder.ConflictUpdateBuilder(this, prefix + TABLE_PROFILES + suffix).
-						column(COLUMN_PLAYER_ID).column(COLUMN_PROFILE_ID)).
+						keyColumn(COLUMN_PLAYER_ID).keyColumn(COLUMN_PROFILE_ID)).
 				build();
 		try (Connection connection = getConnection(); Statement statement = connection.createStatement()) {
 			statement.execute(new TableBuilder(TABLE_PLAYERS).
@@ -98,8 +99,7 @@ public abstract sealed class BackpackDatabase extends Database permits BackpackD
 	}
 
 	@NonNegative
-	private int getExtrasProfile(@NotNull Connection connection,
-								 @NotNull UUID playerID, @NotNull UUID profileID) throws SQLException {
+	private int getExtrasProfile(@NotNull Connection connection, @NotNull UUID playerID, @NotNull UUID profileID) throws SQLException {
 		try (PreparedStatement statement = connection.prepareStatement(STATEMENT_GET_EXTRAS_PROFILE)) {
 			statement.setString(1, playerID.toString());
 			statement.setString(2, profileID.toString());
@@ -111,7 +111,7 @@ public abstract sealed class BackpackDatabase extends Database permits BackpackD
 
 	@ApiStatus.Internal
 	public void insertPlayer(@NotNull UUID playerID) {
-		LoggingManager.exceptionallyLog(this.plugin, CompletableFuture.runAsync(() -> {
+		LoggingManager.exceptionallyLogError(this.plugin, CompletableFuture.runAsync(() -> {
 			try (Connection connection = getConnection(); PreparedStatement statement = connection.prepareStatement(this.statementInsertPlayer)) {
 				statement.setString(1, playerID.toString());
 				statement.executeUpdate();
@@ -124,7 +124,7 @@ public abstract sealed class BackpackDatabase extends Database permits BackpackD
 	@ApiStatus.Internal
 	public void insertProfiles(@NotNull Map<@NotNull UUID, @NotNull Set<@NotNull UUID>> profilesMap) {
 		if (profilesMap.isEmpty()) return;
-		LoggingManager.exceptionallyLog(this.plugin, CompletableFuture.runAsync(() -> {
+		LoggingManager.exceptionallyLogError(this.plugin, CompletableFuture.runAsync(() -> {
 			try (Connection connection = getConnection(); PreparedStatement statement = connection.prepareStatement(this.statementInsertProfile)) {
 				for (Map.Entry<UUID, Set<UUID>> entry : profilesMap.entrySet()) {
 					for (UUID profileID : entry.getValue()) {
@@ -251,7 +251,8 @@ public abstract sealed class BackpackDatabase extends Database permits BackpackD
 	@NotNull
 	public final CompletableFuture<Void> updateExtras(@NotNull UUID playerID, @Nullable UUID profileID, int delta) {
 		if (delta == 0) return CompletableFuture.completedFuture(null);
-		int maxPlayer = this.plugin.backpackConfig().amountExtraPlayerMax(), maxProfile = this.plugin.backpackConfig().amountExtraProfileMax();
+		int maxPlayer = this.plugin.backpackConfig().snapshot().amountExtraPlayerMax(),
+				maxProfile = this.plugin.backpackConfig().snapshot().amountExtraProfileMax();
 		return CompletableFuture.runAsync(() -> {
 			try (Connection connection = getConnection()) {
 				if (profileID == null) {
@@ -308,7 +309,7 @@ public abstract sealed class BackpackDatabase extends Database permits BackpackD
 	@NotNull
 	@ApiStatus.Internal
 	public static BackpackDatabase create(@NotNull MSTBackpack plugin) throws ClassNotFoundException, SQLException {
-		if (plugin.backpackDatabase() != null) throw new IllegalStateException("Backpack database already initialized");
+		Preconditions.checkState(plugin.backpackDatabase() == null, "Backpack database already initialized");
 		return (MSTUtilsDatabase.instance() instanceof LocalDatabaseType) ? new Local(plugin) : new MySQL(plugin);
 	}
 }

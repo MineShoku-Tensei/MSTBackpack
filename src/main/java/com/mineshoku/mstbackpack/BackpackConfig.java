@@ -1,14 +1,16 @@
 package com.mineshoku.mstbackpack;
 
+import com.google.common.base.Preconditions;
+import com.mineshoku.mstutils.MathUtils;
 import com.mineshoku.mstutils.TextUtils;
 import com.mineshoku.mstutils.Utils;
+import com.mineshoku.mstutils.models.PluginConfig;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
-import org.bukkit.configuration.Configuration;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.inventory.ItemStack;
 import org.checkerframework.checker.index.qual.NonNegative;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -19,305 +21,44 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-public final class BackpackConfig {
-	private static final @NotNull String PLACEHOLDER_PLAYER_ID = "player_id";
-	private static final @NotNull String PLACEHOLDER_PLAYER_NAME = "player_name";
-	private static final @NotNull String PLACEHOLDER_PROFILE_ID = "profile_id";
-	private static final @NotNull String PLACEHOLDER_EXTRAS = "extras";
-	private static final @NotNull String PLACEHOLDER_EXTRAS_MAX = "extras_max";
-	private static final @NotNull String PLACEHOLDER_TOTAL = "total";
-	private static final @NotNull String PLACEHOLDER_TOTAL_MAX = "total_max";
-
-	private final @NotNull MSTBackpack plugin;
-	private final @NotNull Configuration defaults;
-	private @NotNull Type type;
-	private boolean condense;
-	private @NonNegative int amountBase;
-	private @NonNegative int amountExtraPlayerMax;
-	private @NonNegative int amountExtraPlayerPer;
-	private @NonNegative int amountExtraProfileMax;
-	private @NonNegative int amountExtraProfilePer;
-	private @NonNegative long clearTimeout;
-	private boolean removeBackpackProfileDelete;
-	private @Nullable Component menuTitle;
-	private boolean menuBorder;
-	private boolean menuShowUnlockable;
-	private @Nullable PageItem menuIndicator;
-	private @NotNull PageItem menuClose;
-	private @NotNull PageItem menuNext;
-	private @NotNull PageItem menuPrevious;
-	private @NotNull PageItem menuBorderStatic;
-	private @NotNull PageItem menuBorderUnlockable;
-	private @Nullable Component messageCommandFailed;
-	private @Nullable Component messageNotFoundPlayer;
-	private @Nullable Component messageNotFoundProfile;
-	private @Nullable String messageClearResend;
-	private @Nullable String messageClearFinish;
-	private @Nullable String messageExtrasSetPlayer;
-	private @Nullable String messageExtrasSetProfile;
-	private @Nullable String messageExtrasInfoPlayer;
-	private @Nullable String messageExtrasInfoProfile;
-	private @Nullable Component messageProfileNotSelected;
-	private @Nullable Component messageOpenFail;
-	private @Nullable Component messageReloaded;
-	private @Nullable String commandUsage;
-	private @Nullable String commandDescription;
-
+public final class BackpackConfig extends PluginConfig<MSTBackpack, BackpackConfig.Info> {
 	public BackpackConfig(@NotNull MSTBackpack plugin) {
-		if (plugin.backpackConfig() != null) throw new IllegalStateException("Config handler already initialized");
-		this.plugin = plugin;
-		this.plugin.saveDefaultConfig();
-		this.defaults = Objects.requireNonNull(config().getDefaults());
+		super(plugin, "config.yml");
+		saveDefaultConfig();
 		recalculate();
 	}
 
-	@NotNull
-	private FileConfiguration config() {
-		return this.plugin.getConfig();
+	@Override
+	protected void testBeforeInit(@NotNull MSTBackpack plugin, @NotNull String resource) {
+		Preconditions.checkState(plugin.backpackConfig() == null, "Config handler already initialized");
 	}
 
-	@Nullable
-	private String stringOrNull(@NotNull String path) {
-		return config().getString(path, null);
-	}
-
-	@NonNegative
-	private int intNonNegative(@NotNull String path) {
-		return Math.max(config().getInt(path), 0);
-	}
-
-	private void recalculate() {
-		this.type = Type.get(stringOrNull("type"));
-		this.condense = config().getBoolean("condense", false);
-		this.amountBase = intNonNegative("base");
-		this.amountExtraPlayerMax = intNonNegative("extra.player.max");
-		this.amountExtraPlayerPer = intNonNegative("extra.player.per");
-		this.amountExtraProfileMax = intNonNegative("extra.profile.max");
-		this.amountExtraProfilePer = intNonNegative("extra.profile.per");
-		int clearTimeout = intNonNegative("clear_resend_seconds");
-		this.clearTimeout = clearTimeout == 0 ? 0 : TimeUnit.SECONDS.toMillis(clearTimeout);
-		this.removeBackpackProfileDelete = config().getBoolean("remove_backpack_profile_delete", true);
-		this.menuTitle = Utils.toRichComponent(stringOrNull("menu.title"));
-		this.menuBorder = config().getBoolean("menu.border", true);
-		this.menuShowUnlockable = config().getBoolean("menu.show_unlockable", true);
-		this.menuIndicator = pageItemFromConfig("menu.item.indicator", null);
-		this.menuClose = pageItemFromConfig("menu.item.close", this.defaults);
-		this.menuNext = pageItemFromConfig("menu.item.next", this.defaults);
-		this.menuPrevious = pageItemFromConfig("menu.item.previous", this.defaults);
-		this.menuBorderStatic = pageItemFromConfig("menu.item.border.regular", this.defaults);
-		this.menuBorderUnlockable = pageItemFromConfig("menu.item.border.unlockable", this.defaults);
-		this.messageCommandFailed = Utils.toRichComponent(stringOrNull("message.command_failed"));
-		this.messageNotFoundPlayer = Utils.toRichComponent(stringOrNull("message.not_found.player"));
-		this.messageNotFoundProfile = Utils.toRichComponent(stringOrNull("message.not_found.profile"));
-		this.messageClearResend = stringOrNull("message.clear.resend");
-		this.messageClearFinish = stringOrNull("message.clear.finish");
-		this.messageExtrasSetPlayer = stringOrNull("message.extras.set.player");
-		this.messageExtrasSetProfile = stringOrNull("message.extras.set.profile");
-		this.messageExtrasInfoPlayer = stringOrNull("message.extras.info.player");
-		this.messageExtrasInfoProfile = stringOrNull("message.extras.info.profile");
-		this.messageProfileNotSelected = Utils.toRichComponent(stringOrNull("message.profile_not_selected"));
-		this.messageOpenFail = Utils.toRichComponent(stringOrNull("message.open_fail"));
-		this.messageReloaded = Utils.toRichComponent(stringOrNull("message.reloaded"));
-		this.commandUsage = stringOrNull("command.usage");
-		this.commandDescription = stringOrNull("command.description");
-	}
-
-	public void reload() {
-		this.plugin.reloadConfig();
-		recalculate();
-	}
-
-	@NotNull
-	public Type type() {
-		return this.type;
-	}
-
-	public boolean condense() {
-		return this.condense;
-	}
-
-	@NonNegative
-	public int amountExtraPlayerMax() {
-		return this.amountExtraPlayerMax;
-	}
-
-	@NonNegative
-	public int amountExtraProfileMax() {
-		return this.amountExtraProfileMax;
-	}
-
-	@NonNegative
-	public int amountExtrasMax() {
-		return amountExtraPlayerMax() + amountExtraProfileMax();
-	}
-
-	@NonNegative
-	private int calculateExtras(@NonNegative int extrasPlayer, @NonNegative int extrasProfile) {
-		int player = Math.min(extrasPlayer, amountExtraPlayerMax());
-		int profile = Math.min(extrasProfile, amountExtraProfileMax());
-		return (player * this.amountExtraPlayerPer) + (profile * this.amountExtraProfilePer);
-	}
-
-	@NonNegative
-	public int calculateAmount(@NonNegative int extrasPlayer, @NonNegative int extrasProfile) {
-		return this.amountBase + calculateExtras(extrasPlayer, extrasProfile);
-	}
-
-	@NonNegative
-	public int amountTotalMax() {
-		return calculateAmount(amountExtraPlayerMax(), amountExtraProfileMax());
-	}
-
-	@NonNegative
-	public long clearTimeout() {
-		return this.clearTimeout;
-	}
-
-	public boolean removeBackpackProfileDelete() {
-		return this.removeBackpackProfileDelete;
-	}
-
-	@Nullable
-	public Component menuTitle() {
-		return this.menuTitle;
-	}
-
-	public boolean menuBorder() {
-		return this.menuBorder;
-	}
-
-	public boolean menuShowUnlockable() {
-		return this.menuShowUnlockable;
-	}
-
-	@Nullable
-	public PageItem menuIndicator() {
-		return this.menuIndicator;
-	}
-
-	@NotNull
-	public PageItem menuClose() {
-		return this.menuClose;
-	}
-
-	@NotNull
-	public PageItem menuNext() {
-		return this.menuNext;
-	}
-
-	@NotNull
-	public PageItem menuPrevious() {
-		return this.menuPrevious;
-	}
-
-	@NotNull
-	public PageItem menuBorderStatic() {
-		return this.menuBorderStatic;
-	}
-
-	@NotNull
-	public PageItem menuBorderUnlockable() {
-		return this.menuBorderUnlockable;
-	}
-
-	@Nullable
-	public Component messageNotFoundPlayer() {
-		return this.messageNotFoundPlayer;
-	}
-
-	@Nullable
-	public Component messageCommandFailed() {
-		return this.messageCommandFailed;
-	}
-
-	@Nullable
-	public Component messageNotFoundProfile() {
-		return this.messageNotFoundProfile;
-	}
-
-	@NotNull
-	private TagResolver tagResolverPlayer(@NotNull UUID playerID, @NotNull String playerName) {
-		return TagResolver.resolver(Utils.unparsedPlaceholder(PLACEHOLDER_PLAYER_NAME, playerName),Utils.unparsedPlaceholder(PLACEHOLDER_PLAYER_ID, playerID));
-	}
-
-	@NotNull
-	private TagResolver tagResolverPlayerProfile(@NotNull UUID playerID, @NotNull String playerName, @NotNull UUID profileID) {
-		return TagResolver.resolver(tagResolverPlayer(playerID, playerName), Utils.unparsedPlaceholder(PLACEHOLDER_PROFILE_ID, profileID));
-	}
-
-	@Nullable
-	public Component messageClearResend(@NotNull UUID playerID, @NotNull String playerName, @NotNull UUID profileID) {
-		return this.messageClearResend == null ? null :
-				Utils.toRichComponent(this.messageClearResend, tagResolverPlayerProfile(playerID, playerName, profileID));
-	}
-
-	@Nullable
-	public Component messageClearFinish(@NotNull UUID playerID, @NotNull String playerName, @NotNull UUID profileID) {
-		return this.messageClearFinish == null ? null :
-				Utils.toRichComponent(this.messageClearFinish, tagResolverPlayerProfile(playerID, playerName, profileID));
-	}
-
-	@Nullable
-	public Component messageExtrasSet(@NotNull UUID playerID, @NotNull String playerName, @Nullable UUID profileID) {
-		return profileID == null ? (this.messageExtrasSetPlayer == null ? null :
-				Utils.toRichComponent(this.messageExtrasSetPlayer,tagResolverPlayer(playerID, playerName))) :
-				(this.messageExtrasSetProfile == null ? null :
-						Utils.toRichComponent(this.messageExtrasSetProfile, tagResolverPlayerProfile(playerID, playerName, profileID)));
-	}
-
-	@Nullable
-	public Component messageExtrasInfo(@NotNull UUID playerID, @NotNull String playerName, @Nullable UUID profileID,
-									   @NonNegative int extrasPlayer, @NonNegative int extrasProfile) {
-		return profileID == null ? (this.messageExtrasInfoPlayer == null ? null :
-				Utils.toRichComponent(this.messageExtrasInfoPlayer, tagResolverPlayer(playerID, playerName),
-						Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS, extrasPlayer),
-						Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS_MAX, amountExtraPlayerMax()))) :
-				(this.messageExtrasInfoProfile == null ? null :
-						Utils.toRichComponent(this.messageExtrasInfoProfile, tagResolverPlayerProfile(playerID, playerName, profileID),
-								Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS, extrasProfile),
-								Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS_MAX, amountExtraProfileMax()),
-								Utils.unparsedPlaceholder(PLACEHOLDER_TOTAL, extrasPlayer + extrasProfile),
-								Utils.unparsedPlaceholder(PLACEHOLDER_TOTAL_MAX, amountExtrasMax())));
-	}
-
-	@Nullable
-	public Component messageProfileNotSelected() {
-		return this.messageProfileNotSelected;
-	}
-
-	@Nullable
-	public Component messageOpenFail() {
-		return this.messageOpenFail;
-	}
-
-	@Nullable
-	public Component messageReloaded() {
-		return this.messageReloaded;
-	}
-
-	@NotNull
-	public String commandUsage() {
-		return this.commandUsage == null ? "" : this.commandUsage;
-	}
-
-	@NotNull
-	public String commandDescription() {
-		return this.commandDescription == null ? "" : this.commandDescription;
+	@Override
+	protected void recalculate() {
+		this.snapshot = new Info(Utils.thisOrThat(Type.get(stringNoDefault("type")), Type.PAGES), config().getBoolean("condense", false),
+				intNonNegative("base"), intNonNegative("extra.player.max"), intNonNegative("extra.player.per"),
+				intNonNegative("extra.profile.max"), intNonNegative("extra.profile.per"),
+				MathUtils.thisOrThatMinimum(Utils.parseShortDurationMillis(config().get("clear_resend_timeout", null), TimeUnit.SECONDS), 0L),
+				config().getBoolean("remove_backpack_profile_delete", true), Utils.toRichComponent(stringNoDefault("menu.title")),
+				config().getBoolean("menu.border", true), config().getBoolean("menu.show_unlockable", true),
+				pageItemFromConfig("menu.item.indicator", false), pageItemFromConfig("menu.item.close", true), pageItemFromConfig("menu.item.next", true),
+				pageItemFromConfig("menu.item.previous", true), pageItemFromConfig("menu.item.border.regular", true),
+				pageItemFromConfig("menu.item.border.unlockable", true), Utils.toRichComponent(stringNoDefault("message.command_failed")),
+				Utils.toRichComponent(stringNoDefault("message.not_found.player")), Utils.toRichComponent(stringNoDefault("message.not_found.profile")),
+				stringNoDefault("message.clear.resend"), stringNoDefault("message.clear.finish"), stringNoDefault("message.extras.set.player"),
+				stringNoDefault("message.extras.set.profile"), stringNoDefault("message.extras.info.player"), stringNoDefault("message.extras.info.profile"),
+				Utils.toRichComponent(stringNoDefault("message.profile_not_selected")), Utils.toRichComponent(stringNoDefault("message.open_fail")),
+				Utils.toRichComponent(stringNoDefault("message.reloaded")), stringNoDefault("command.usage"), stringNoDefault("command.description"));
 	}
 	
 	@Nullable
-	@Contract("_, !null -> new")
-	private PageItem pageItemFromConfig(@NotNull String sectionName, @Nullable Configuration defaults) {
+	@Contract("_, true -> new")
+	private BackpackMenuItem pageItemFromConfig(@NotNull String sectionName, boolean useDefaults) {
 		ConfigurationSection section = config().getConfigurationSection(sectionName);
-		ConfigurationSection sectionDefaults = defaults == null ? null : defaults.getConfigurationSection(sectionName);
 		Objects.requireNonNull(section);
-		String type = section.getString("type", null);
-		Material material;
-		if (type == null || (material = Material.getMaterial(TextUtils.toUpperCase(type.replace(" ", "_")))) == null) {
-			if (sectionDefaults == null) return null;
-			String typeDefault = Objects.requireNonNull(TextUtils.toUpperCase(sectionDefaults.getString("type", null)));
-			material = Objects.requireNonNull(Material.getMaterial(typeDefault));
-		}
+		ConfigurationSection sectionDefaults = useDefaults ? Objects.requireNonNull(section.getDefaultSection()) : null;
+		Material material = Objects.requireNonNull(Utils.getMaterialOrDefault(section.getString("type", null),
+				sectionDefaults == null ? null : sectionDefaults.getString("type", null)));
 		int slot;
 		if (section.contains("slot", true)) {
 			slot = section.getInt("slot");
@@ -337,23 +78,37 @@ public final class BackpackConfig {
 				lore = TextUtils.isNullOrBlank(l) ? null : List.of(l);
 			}
 		}
-		NamespacedKey model = null;
-		Integer customModel = null;
+		NamespacedKey model;
+		Integer customModel;
 		if (section.contains("model", true)) {
 			if (section.isInt("model")) {
-				customModel = section.getInt("model");
-				if (customModel <= 0) {
-					customModel = null;
-				}
+				model = null;
+				int m = section.getInt("model");
+				customModel = m <= 0 ? null : m;
 			} else {
+				customModel = null;
 				String m = section.getString("model", null);
-				if (m != null) {
+				if (m == null) {
+					model = null;
+				} else {
 					String[] arr = m.split(":", 2);
 					model = new NamespacedKey(arr.length < 2 ? NamespacedKey.MINECRAFT : arr[0], arr[arr.length < 2 ? 0 : 1]);
 				}
 			}
+		} else {
+			model = null;
+			customModel = null;
 		}
-		return new PageItem(material, name, lore, model, customModel, slot);
+		ItemStack item = ItemStack.of(material);
+		item.editMeta(meta -> {
+			if (model != null) {
+				meta.setItemModel(model);
+			}
+			if (customModel != null) {
+				meta.setCustomModelData(customModel);
+			}
+		});
+		return new BackpackMenuItem(item, name, lore, slot);
 	}
 
 	public enum Type {
@@ -361,13 +116,106 @@ public final class BackpackConfig {
 		LINES,
 		SLOTS;
 
-		public static Type get(@Nullable String type) {
-			if (type == null) return PAGES;
-			try {
-				return Type.valueOf(TextUtils.toUpperCase(type));
-			} catch (IllegalArgumentException e) {
-				return PAGES;
-			}
+		@Nullable
+		@Contract(value = "null -> null", pure = true)
+		public static Type get(@Nullable String name) {
+			return Utils.enumFromName(Type.class, name);
+		}
+	}
+
+	public record Info(@NotNull Type type, boolean condense, @NonNegative int amountBase, @NonNegative int amountExtraPlayerMax,
+					   @NonNegative int amountExtraPlayerPer, @NonNegative int amountExtraProfileMax, @NonNegative int amountExtraProfilePer,
+					   @NonNegative long clearTimeoutMillis, boolean removeBackpackProfileDelete, @Nullable Component menuTitle, boolean menuBorder,
+					   boolean menuShowUnlockable, @Nullable BackpackMenuItem menuIndicator, @NotNull BackpackMenuItem menuClose, @NotNull BackpackMenuItem menuNext,
+					   @NotNull BackpackMenuItem menuPrevious, @NotNull BackpackMenuItem menuBorderStatic, @NotNull BackpackMenuItem menuBorderUnlockable,
+					   @Nullable Component messageCommandFailed, @Nullable Component messageNotFoundPlayer, @Nullable Component messageNotFoundProfile,
+					   @Nullable String messageClearResend, @Nullable String messageClearFinish, @Nullable String messageExtrasSetPlayer,
+					   @Nullable String messageExtrasSetProfile, @Nullable String messageExtrasInfoPlayer, @Nullable String messageExtrasInfoProfile,
+					   @Nullable Component messageProfileNotSelected, @Nullable Component messageOpenFail, @Nullable Component messageReloaded,
+					   @Nullable String commandUsage, @Nullable String commandDescription) {
+		private static final @NotNull String PLACEHOLDER_PLAYER_ID = "player_id";
+		private static final @NotNull String PLACEHOLDER_PLAYER_NAME = "player_name";
+		private static final @NotNull String PLACEHOLDER_PROFILE_ID = "profile_id";
+		private static final @NotNull String PLACEHOLDER_EXTRAS = "extras";
+		private static final @NotNull String PLACEHOLDER_EXTRAS_MAX = "extras_max";
+		private static final @NotNull String PLACEHOLDER_TOTAL = "total";
+		private static final @NotNull String PLACEHOLDER_TOTAL_MAX = "total_max";
+
+		@NonNegative
+		public int amountExtraPlayerMax() {
+			return this.amountExtraPlayerMax;
+		}
+
+		@NonNegative
+		public int amountExtraProfileMax() {
+			return this.amountExtraProfileMax;
+		}
+
+		@NonNegative
+		public int amountExtrasMax() {
+			return amountExtraPlayerMax() + amountExtraProfileMax();
+		}
+
+		@NonNegative
+		private int calculateExtras(@NonNegative int extrasPlayer, @NonNegative int extrasProfile) {
+			int player = Math.min(extrasPlayer, amountExtraPlayerMax());
+			int profile = Math.min(extrasProfile, amountExtraProfileMax());
+			return (player * this.amountExtraPlayerPer) + (profile * this.amountExtraProfilePer);
+		}
+
+		@NonNegative
+		public int calculateAmount(@NonNegative int extrasPlayer, @NonNegative int extrasProfile) {
+			return this.amountBase + calculateExtras(extrasPlayer, extrasProfile);
+		}
+
+		@NonNegative
+		public int amountTotalMax() {
+			return calculateAmount(amountExtraPlayerMax(), amountExtraProfileMax());
+		}
+
+		@NotNull
+		private TagResolver tagResolverPlayer(@NotNull UUID playerID, @NotNull String playerName) {
+			return TagResolver.resolver(Utils.unparsedPlaceholder(PLACEHOLDER_PLAYER_NAME, playerName), Utils.unparsedPlaceholder(PLACEHOLDER_PLAYER_ID, playerID));
+		}
+
+		@NotNull
+		private TagResolver tagResolverPlayerProfile(@NotNull UUID playerID, @NotNull String playerName, @NotNull UUID profileID) {
+			return TagResolver.resolver(tagResolverPlayer(playerID, playerName), Utils.unparsedPlaceholder(PLACEHOLDER_PROFILE_ID, profileID));
+		}
+
+		@Nullable
+		public Component messageClearResend(@NotNull UUID playerID, @NotNull String playerName, @NotNull UUID profileID) {
+			return this.messageClearResend == null ? null :
+					Utils.toRichComponent(this.messageClearResend, tagResolverPlayerProfile(playerID, playerName, profileID));
+		}
+
+		@Nullable
+		public Component messageClearFinish(@NotNull UUID playerID, @NotNull String playerName, @NotNull UUID profileID) {
+			return this.messageClearFinish == null ? null :
+					Utils.toRichComponent(this.messageClearFinish, tagResolverPlayerProfile(playerID, playerName, profileID));
+		}
+
+		@Nullable
+		public Component messageExtrasSet(@NotNull UUID playerID, @NotNull String playerName, @Nullable UUID profileID) {
+			return profileID == null ? (this.messageExtrasSetPlayer == null ? null :
+					Utils.toRichComponent(this.messageExtrasSetPlayer, tagResolverPlayer(playerID, playerName))) :
+					(this.messageExtrasSetProfile == null ? null :
+							Utils.toRichComponent(this.messageExtrasSetProfile, tagResolverPlayerProfile(playerID, playerName, profileID)));
+		}
+
+		@Nullable
+		public Component messageExtrasInfo(@NotNull UUID playerID, @NotNull String playerName, @Nullable UUID profileID,
+										   @NonNegative int extrasPlayer, @NonNegative int extrasProfile) {
+			return profileID == null ? (this.messageExtrasInfoPlayer == null ? null :
+					Utils.toRichComponent(this.messageExtrasInfoPlayer, tagResolverPlayer(playerID, playerName),
+							Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS, extrasPlayer),
+							Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS_MAX, amountExtraPlayerMax()))) :
+					(this.messageExtrasInfoProfile == null ? null :
+							Utils.toRichComponent(this.messageExtrasInfoProfile, tagResolverPlayerProfile(playerID, playerName, profileID),
+									Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS, extrasProfile),
+									Utils.unparsedPlaceholder(PLACEHOLDER_EXTRAS_MAX, amountExtraProfileMax()),
+									Utils.unparsedPlaceholder(PLACEHOLDER_TOTAL, extrasPlayer + extrasProfile),
+									Utils.unparsedPlaceholder(PLACEHOLDER_TOTAL_MAX, amountExtrasMax())));
 		}
 	}
 }

@@ -28,7 +28,7 @@ public class BackpackTabCompleteTest {
 	@BeforeEach
 	void setUp() {
 		this.server = MockBukkit.mock();
-		TestUtils.loadMSTUtils();
+		TestUtils.loadUtilsPlugin();
 		this.plugin = MockBukkit.load(MSTBackpack.class);
 	}
 

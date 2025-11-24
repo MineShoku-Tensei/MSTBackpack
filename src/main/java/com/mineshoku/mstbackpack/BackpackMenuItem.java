@@ -3,20 +3,23 @@ package com.mineshoku.mstbackpack;
 import com.mineshoku.mstutils.MathUtils;
 import com.mineshoku.mstutils.TextUtils;
 import com.mineshoku.mstutils.Utils;
+import com.mineshoku.mstutils.menus.MenuItem;
+import com.mineshoku.mstutils.menus.MenuPages;
 import net.kyori.adventure.text.Component;
-import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
 import org.checkerframework.checker.index.qual.NonNegative;
 import org.checkerframework.checker.index.qual.Positive;
-import org.jetbrains.annotations.*;
+import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
 
 @ApiStatus.Internal
-public record PageItem(@NotNull Material material, @Nullable String name, @Nullable @Unmodifiable List<String> lore,
-					   @Nullable NamespacedKey model, @Nullable @Positive Integer customModel, int slot) {
+public final class BackpackMenuItem extends MenuItem.Unique<MSTBackpack, BackpackMenuPages.MenuInfo> {
 	private static final @NotNull String PLACEHOLDER_PAGE = "page";
 	private static final @NotNull String PLACEHOLDER_PAGES_TOTAL = "pages";
 	private static final @NotNull String PLACEHOLDER_EXTRAS_PLAYER = "extras_player";
@@ -27,29 +30,43 @@ public record PageItem(@NotNull Material material, @Nullable String name, @Nulla
 	private static final @NotNull String PLACEHOLDER_EXTRAS_TOTAL_MAX = "extras_total_max";
 	private static final @NotNull Pattern PATTERN_PAGE = Pattern.compile("<" + PLACEHOLDER_PAGE + "([+-]\\d+)>");
 
+	private final @NotNull ItemStack item;
+	private final @Nullable String name;
+	private final @Nullable @Unmodifiable List<String> lore;
+	private final int slot;
+
+	public BackpackMenuItem(@NotNull ItemStack item, @Nullable String name, @Nullable List<String> lore, int slot) {
+		this.item = item.clone();
+		this.name = name;
+		this.lore = lore == null ? null : Collections.unmodifiableList(lore);
+		this.slot = slot;
+	}
+
+	public int slot() {
+		return slot;
+	}
+
+	@Override
 	@NotNull
-	@Contract("_, _, _, _, _, _ -> new")
-	public ItemStack toItemStack(@Positive int currentPage, @NonNegative int totalPages, @NonNegative int extrasPlayer, @NonNegative int extrasProfile,
-								 @NonNegative int extrasPlayerMax, @NonNegative int extrasProfileMax) {
-		ItemStack item = ItemStack.of(this.material);
-		item.editMeta(meta -> {
+	protected ItemStack toItemStackNotUnique(@NotNull MenuPages<MSTBackpack, BackpackMenuPages.MenuInfo> menuPages) {
+		int currentPage = menuPages.currentPage(), totalPages = menuPages.maxPages(), extrasPlayer = menuPages.info().backpackInfo().extrasPlayer(),
+				extrasProfile = menuPages.info().backpackInfo().extrasProfile(),
+				extrasPlayerMax = menuPages.plugin().backpackConfig().snapshot().amountExtraPlayerMax(),
+				extrasProfileMax = menuPages.plugin().backpackConfig().snapshot().amountExtraProfileMax();
+		ItemStack clone = this.item.clone();
+		clone.editMeta(meta -> {
 			meta.itemName(replace(this.name, currentPage, totalPages, extrasPlayer, extrasProfile, extrasPlayerMax, extrasProfileMax));
 			if (this.lore != null) {
 				meta.lore(this.lore.stream().
 						map(str -> replace(str, currentPage, totalPages, extrasPlayer, extrasProfile, extrasPlayerMax, extrasProfileMax)).toList());
 			}
-			if (this.model != null) {
-				meta.setItemModel(this.model);
-			}
-			if (this.customModel != null) {
-				meta.setCustomModelData(this.customModel);
-			}
 		});
-		return item;
+		return clone;
 	}
 
+	@ApiStatus.Internal
 	@NotNull
-	private static Component replace(@Nullable String str, @Positive int currentPage, @NonNegative int totalPages,
+	public static Component replace(@Nullable String str, @Positive int currentPage, @NonNegative int totalPages,
 									 @NonNegative int extrasPlayer, @NonNegative int extrasProfile,
 									 @NonNegative int extrasPlayerMax, @NonNegative int extrasProfileMax) {
 		if (TextUtils.isNullOrBlank(str)) return Component.empty();

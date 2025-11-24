@@ -5,9 +5,7 @@ import com.mineshoku.mstutils.models.Pair;
 import com.mineshoku.mstutils.tests.MockPlayerProfile;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
-import org.bukkit.Material;
 import org.bukkit.event.inventory.InventoryType;
-import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +30,7 @@ public class BackpackCommandTest {
 	@BeforeEach
 	void setUp() {
 		this.server = MockBukkit.mock();
-		TestUtils.loadMSTUtils();
+		TestUtils.loadUtilsPlugin();
 		this.plugin = MockBukkit.load(MSTBackpack.class);
 	}
 
@@ -114,7 +112,8 @@ public class BackpackCommandTest {
 		TestUtils.addProfiles(player, 1);
 		UUID playerID = player.getUniqueId(), profileID = Objects.requireNonNull(TestUtils.setCurrentProfileIfNotSet(player)).getUniqueId();
 		String playerName = player.getName();
-		int playerMax = this.plugin.backpackConfig().amountExtraPlayerMax(), profileMax = this.plugin.backpackConfig().amountExtraProfileMax();
+		int playerMax = this.plugin.backpackConfig().snapshot().amountExtraPlayerMax(),
+				profileMax = this.plugin.backpackConfig().snapshot().amountExtraProfileMax();
 		TestUtils.waitAsync(this.server);
 		TestUtils.performCommandWithAsync(this.server, player, TestUtils.cmd(COMMAND, false, "upgrade", playerID));
 		checkExtras(playerID, profileID, 1, 0);
@@ -159,13 +158,14 @@ public class BackpackCommandTest {
 		TestUtils.setPermission(this.plugin, player2, BackpackCommandHandler.PERMISSION_ADVANCED, true);
 		TestUtils.addProfiles(player1, 1);
 		UUID playerID = player1.getUniqueId(), profileID = Objects.requireNonNull(TestUtils.setCurrentProfileIfNotSet(player1)).getUniqueId();
-		int maxPlayer = this.plugin.backpackConfig().amountExtraPlayerMax(), maxProfile = this.plugin.backpackConfig().amountExtraProfileMax();
+		int maxPlayer = this.plugin.backpackConfig().snapshot().amountExtraPlayerMax(),
+				maxProfile = this.plugin.backpackConfig().snapshot().amountExtraProfileMax();
 		String playerName = player1.getName();
 		TestUtils.waitAsync(this.server);
-		Component msg0Player = this.plugin.backpackConfig().messageExtrasInfo(playerID, playerName, null, 0, 0),
-				msg0Profile = this.plugin.backpackConfig().messageExtrasInfo(playerID, playerName, profileID, 0, 0),
-				msgPlayer = this.plugin.backpackConfig().messageExtrasInfo(playerID, playerName, null, maxPlayer, 0),
-				msgProfile = this.plugin.backpackConfig().messageExtrasInfo(playerID, playerName, profileID, maxPlayer, maxProfile);
+		Component msg0Player = this.plugin.backpackConfig().snapshot().messageExtrasInfo(playerID, playerName, null, 0, 0),
+				msg0Profile = this.plugin.backpackConfig().snapshot().messageExtrasInfo(playerID, playerName, profileID, 0, 0),
+				msgPlayer = this.plugin.backpackConfig().snapshot().messageExtrasInfo(playerID, playerName, null, maxPlayer, 0),
+				msgProfile = this.plugin.backpackConfig().snapshot().messageExtrasInfo(playerID, playerName, profileID, maxPlayer, maxProfile);
 		TestUtils.performCommandWithAsync(this.server, player1, TestUtils.cmd(COMMAND, false, "info", playerID));
 		assertEquals(msg0Player, player1.nextComponentMessage());
 		TestUtils.performCommandWithAsync(this.server, player1, TestUtils.cmd(COMMAND, false, "info", playerName));
@@ -189,8 +189,7 @@ public class BackpackCommandTest {
 
 	@Test
 	void pageItem() {
-		ItemStack item = new PageItem(Material.DIRT, "<page-2><page-1><page><page+1><page+2>", null, null, null, 0).toItemStack(4, 10, 0, 0, 0, 0);
-		Component name = item.getItemMeta().itemName();
+		Component name = BackpackMenuItem.replace("<page-2><page-1><page><page+1><page+2>", 4, 10, 0, 0, 0, 0);
 		assertInstanceOf(TextComponent.class, name);
 		assertEquals("23456", ((TextComponent) name).content());
 	}

@@ -19,9 +19,10 @@ extra:
         max: 10
         # How many to add per extra
         per: 1
-# How many seconds can pass between '/backpack clear ...' and confirmation until another is required
+# How long can pass between '/backpack clear ...' and confirmation until another is required
+# Format: '?ms' (milliseconds) | '?' (seconds) | '?s' (seconds) | '?m' (minutes) | '?h' (hours) | '?d' (days)
 # Set to 0 or less to enable immediate clear without confirmation
-clear_resend_seconds: 5
+clear_resend_timeout: 5
 # Delete profile's backpack on profile delete
 remove_backpack_profile_delete: true
 # Backpack menu options
